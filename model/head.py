@@ -148,10 +148,6 @@ class DetectionBlock(paddle.nn.Layer):
             input_c = in_c + 2 if coord_conv else in_c
         else:
             input_c = channel * 2 + 2 if coord_conv else channel * 2
-        if '{}.2'.format(name) == 'yolo_block.0.2':
-            pruned_ratio = 0.2
-            pruned_num = int(round(channel * pruned_ratio))
-            channel = channel - pruned_num
         conv_unit = Conv2dUnit(input_c, channel, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', norm_decay=self.norm_decay, name='{}.2'.format(name))
         self.layers.append(coordConv)
         self.layers.append(conv_unit)
