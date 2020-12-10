@@ -1325,13 +1325,15 @@ class Gt2YoloTargetSingle(BaseOperator):
                  anchor_masks,
                  downsample_ratios,
                  num_classes=80,
-                 iou_thresh=1.):
+                 iou_thresh=1.,
+                 for_myloss=False):
         super(Gt2YoloTargetSingle, self).__init__()
         self.anchors = anchors
         self.anchor_masks = anchor_masks
         self.downsample_ratios = downsample_ratios
         self.num_classes = num_classes
         self.iou_thresh = iou_thresh
+        self.for_myloss = for_myloss
 
     def __call__(self, sample, context=None):
         assert len(self.anchor_masks) == len(self.downsample_ratios), \
@@ -1379,14 +1381,22 @@ class Gt2YoloTargetSingle(BaseOperator):
                 if best_idx in mask:
                     best_n = mask.index(best_idx)
 
-                    # x, y, w, h, scale
-                    target[best_n, 0, gj, gi] = gx * grid_w - gi
-                    target[best_n, 1, gj, gi] = gy * grid_h - gj
-                    target[best_n, 2, gj, gi] = np.log(
-                        gw * w / self.anchors[best_idx][0])
-                    target[best_n, 3, gj, gi] = np.log(
-                        gh * h / self.anchors[best_idx][1])
-                    target[best_n, 4, gj, gi] = 2.0 - gw * gh
+                    if self.for_myloss:
+                        # x, y, w, h, scale
+                        target[best_n, 0, gj, gi] = gx * w
+                        target[best_n, 1, gj, gi] = gy * h
+                        target[best_n, 2, gj, gi] = gw * w
+                        target[best_n, 3, gj, gi] = gh * h
+                        target[best_n, 4, gj, gi] = 2.0 - gw * gh
+                    else:
+                        # x, y, w, h, scale
+                        target[best_n, 0, gj, gi] = gx * grid_w - gi
+                        target[best_n, 1, gj, gi] = gy * grid_h - gj
+                        target[best_n, 2, gj, gi] = np.log(
+                            gw * w / self.anchors[best_idx][0])
+                        target[best_n, 3, gj, gi] = np.log(
+                            gh * h / self.anchors[best_idx][1])
+                        target[best_n, 4, gj, gi] = 2.0 - gw * gh
 
                     # objectness record gt_score
                     target[best_n, 5, gj, gi] = score
@@ -1403,14 +1413,22 @@ class Gt2YoloTargetSingle(BaseOperator):
                             [0., 0., gw, gh],
                             [0., 0., an_hw[mask_i, 0], an_hw[mask_i, 1]])
                         if iou > self.iou_thresh:
-                            # x, y, w, h, scale
-                            target[idx, 0, gj, gi] = gx * grid_w - gi
-                            target[idx, 1, gj, gi] = gy * grid_h - gj
-                            target[idx, 2, gj, gi] = np.log(
-                                gw * w / self.anchors[mask_i][0])
-                            target[idx, 3, gj, gi] = np.log(
-                                gh * h / self.anchors[mask_i][1])
-                            target[idx, 4, gj, gi] = 2.0 - gw * gh
+                            if self.for_myloss:
+                                # x, y, w, h, scale
+                                target[idx, 0, gj, gi] = gx * w
+                                target[idx, 1, gj, gi] = gy * h
+                                target[idx, 2, gj, gi] = gw * w
+                                target[idx, 3, gj, gi] = gh * h
+                                target[idx, 4, gj, gi] = 2.0 - gw * gh
+                            else:
+                                # x, y, w, h, scale
+                                target[idx, 0, gj, gi] = gx * grid_w - gi
+                                target[idx, 1, gj, gi] = gy * grid_h - gj
+                                target[idx, 2, gj, gi] = np.log(
+                                    gw * w / self.anchors[mask_i][0])
+                                target[idx, 3, gj, gi] = np.log(
+                                    gh * h / self.anchors[mask_i][1])
+                                target[idx, 4, gj, gi] = 2.0 - gw * gh
 
                             # objectness record gt_score
                             target[idx, 5, gj, gi] = score
@@ -1418,6 +1436,8 @@ class Gt2YoloTargetSingle(BaseOperator):
                             # classification
                             target[idx, 6 + cls, gj, gi] = 1.
             sample['target{}'.format(i)] = target
+        if self.for_myloss:
+            sample['gt_bbox'] = gt_bbox * [w, h, w, h]
         return sample
 
 

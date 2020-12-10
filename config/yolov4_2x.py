@@ -139,7 +139,7 @@ class YOLOv4_2x_Config(object):
             max_height=608,
             max_width=608,
         )
-        self.yolo_loss_type = 'YOLOv3Loss'
+        self.yolo_loss_type = 'MyLoss'   # 使用MyLoss时需要同步设置gt2YoloTarget的for_myloss为True
         self.yolo_loss = dict(
             ignore_thresh=0.7,
             scale_x_y=1.05,
@@ -215,6 +215,7 @@ class YOLOv4_2x_Config(object):
                      [142, 110], [192, 243], [459, 401]],
             downsample_ratios=[32, 16, 8],
             num_classes=self.num_classes,
+            for_myloss=True,
         )
         # ResizeImage
         self.resizeImage = dict(

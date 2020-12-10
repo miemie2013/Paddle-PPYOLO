@@ -19,6 +19,12 @@ nvidia-smi
 cd ~/w*
 cp ../data/data64338/dygraph_yolov4_2x.pdparams ./dygraph_yolov4_2x.pdparams
 
+(或者下载yolov4.pt
+链接：https://pan.baidu.com/s/152poRrQW9Na_C8rkhNEh3g
+提取码：09ou
+将它放在项目根目录下。然后运行1_yolov4_2x_2paddle.py
+)
+
 
 
 下载预训练模型ppyolo.pdparams

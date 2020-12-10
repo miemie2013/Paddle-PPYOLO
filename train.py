@@ -464,25 +464,13 @@ if __name__ == '__main__':
             else:
                 targets = [target0, target1]
             losses = model.train_model(images, gt_bbox, gt_class, gt_score, targets)
-            loss_xy = losses['loss_xy']
-            loss_wh = losses['loss_wh']
-            loss_obj = losses['loss_obj']
-            loss_cls = losses['loss_cls']
-            loss_iou = losses['loss_iou']
-            if cfg.head['iou_aware']:
-                loss_iou_aware = losses['loss_iou_aware']
-                all_loss = loss_xy + loss_wh + loss_obj + loss_cls + loss_iou + loss_iou_aware
-            else:
-                all_loss = loss_xy + loss_wh + loss_obj + loss_cls + loss_iou
-
+            all_loss = 0.0
+            loss_names = {}
+            for loss_name in losses.keys():
+                sub_loss = losses[loss_name]
+                all_loss += sub_loss
+                loss_names[loss_name] = sub_loss.numpy()[0]
             _all_loss = all_loss.numpy()[0]
-            _loss_xy = loss_xy.numpy()[0]
-            _loss_wh = loss_wh.numpy()[0]
-            _loss_obj = loss_obj.numpy()[0]
-            _loss_cls = loss_cls.numpy()[0]
-            _loss_iou = loss_iou.numpy()[0]
-            if cfg.head['iou_aware']:
-                _loss_iou_aware = loss_iou_aware.numpy()[0]
 
             # 更新权重
             lr = calc_lr(iter_id, cfg)
@@ -496,13 +484,11 @@ if __name__ == '__main__':
             # ==================== log ====================
             if iter_id % 20 == 0:
                 lr = optimizer.get_lr()
-                strs = ''
-                if cfg.head['iou_aware']:
-                    strs = 'Train iter: {}, lr: {:.9f}, all_loss: {:.6f}, loss_xy: {:.6f}, loss_wh: {:.6f}, loss_obj: {:.6f}, loss_cls: {:.6f}, loss_iou: {:.6f}, loss_iou_aware: {:.6f}, eta: {}'.format(
-                        iter_id, lr, _all_loss, _loss_xy, _loss_wh, _loss_obj, _loss_cls, _loss_iou, _loss_iou_aware, eta)
-                else:
-                    strs = 'Train iter: {}, lr: {:.9f}, all_loss: {:.6f}, loss_xy: {:.6f}, loss_wh: {:.6f}, loss_obj: {:.6f}, loss_cls: {:.6f}, loss_iou: {:.6f}, eta: {}'.format(
-                        iter_id, lr, _all_loss, _loss_xy, _loss_wh, _loss_obj, _loss_cls, _loss_iou, eta)
+                each_loss = ''
+                for loss_name in loss_names.keys():
+                    loss_value = loss_names[loss_name]
+                    each_loss += ' %s: %.3f,' % (loss_name, loss_value)
+                strs = 'Train iter: {}, lr: {:.9f}, all_loss: {:.3f},{} eta: {}'.format(iter_id, lr, _all_loss, each_loss, eta)
                 logger.info(strs)
 
             # ==================== save ====================

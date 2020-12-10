@@ -8,6 +8,7 @@
 #
 # ================================================================
 from model.losses import *
+from model.my_loss import *
 from model.iou_losses import *
 from model.head import *
 from model.yolov4_head import *
@@ -39,6 +40,8 @@ def select_loss(name):
         return IouLoss
     if name == 'IouAwareLoss':
         return IouAwareLoss
+    if name == 'MyLoss':
+        return MyLoss
 
 def select_regularization(name):
     if name == 'L1Decay':
