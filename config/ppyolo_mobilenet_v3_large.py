@@ -51,6 +51,8 @@ class PPYOLO_mobilenet_v3_large_Config(object):
             save_iter=1000,   # 每隔几步保存一次模型
             eval_iter=5000,   # 每隔几步计算一次eval集的mAP
             max_iters=250000,   # 训练多少步
+            mixup_epoch=10,     # 前几轮进行mixup
+            cutmix_epoch=-1,    # 前几轮进行cutmix
         )
         self.learningRate = dict(
             base_lr=0.0001,
@@ -158,6 +160,7 @@ class PPYOLO_mobilenet_v3_large_Config(object):
         self.decodeImage = dict(
             to_rgb=True,
             with_mixup=True,
+            with_cutmix=False,
         )
         # MixupImage
         self.mixupImage = dict(

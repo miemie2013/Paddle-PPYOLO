@@ -58,7 +58,7 @@ place = paddle.CUDAPlace(gpu_id) if use_gpu else paddle.CPUPlace()
 
 
 def multi_thread_op(i, num_threads, batch_size, samples, context, with_mixup, sample_transforms, batch_transforms,
-                    shape, images, gt_bbox, gt_score, gt_class, target0, target1, target2, target_num):
+                    shape, images, gt_bbox, gt_score, gt_class, target0, target1, target2, n_layers):
     for k in range(i, batch_size, num_threads):
         for sample_transform in sample_transforms:
             if isinstance(sample_transform, MixupImage):
@@ -80,7 +80,7 @@ def multi_thread_op(i, num_threads, batch_size, samples, context, with_mixup, sa
         gt_class[k] = np.expand_dims(samples[k]['gt_class'].astype(np.int32), 0)
         target0[k] = np.expand_dims(samples[k]['target0'].astype(np.float32), 0)
         target1[k] = np.expand_dims(samples[k]['target1'].astype(np.float32), 0)
-        if target_num > 2:
+        if n_layers > 2:
             target2[k] = np.expand_dims(samples[k]['target2'].astype(np.float32), 0)
 
 
@@ -92,7 +92,8 @@ def read_train_data(cfg,
                     _iter_id,
                     train_dic,
                     use_gpu,
-                    context, with_mixup, sample_transforms, batch_transforms, target_num):
+                    n_layers,
+                    context, with_mixup, sample_transforms, batch_transforms):
     iter_id = _iter_id
     num_threads = cfg.train_cfg['num_threads']
     while True:   # 无限个epoch
@@ -124,7 +125,7 @@ def read_train_data(cfg,
             threads = []
             for i in range(num_threads):
                 t = threading.Thread(target=multi_thread_op, args=(i, num_threads, batch_size, samples, context, with_mixup, sample_transforms, batch_transforms,
-                                                                   shape, images, gt_bbox, gt_score, gt_class, target0, target1, target2, target_num))
+                                                                   shape, images, gt_bbox, gt_score, gt_class, target0, target1, target2, n_layers))
                 threads.append(t)
                 t.start()
             # 等待所有线程任务结束。
@@ -137,7 +138,7 @@ def read_train_data(cfg,
             gt_class = np.concatenate(gt_class, 0)
             target0 = np.concatenate(target0, 0)
             target1 = np.concatenate(target1, 0)
-            if target_num > 2:
+            if n_layers > 2:
                 target2 = np.concatenate(target2, 0)
 
             images = paddle.to_tensor(images, place=place)
@@ -146,7 +147,7 @@ def read_train_data(cfg,
             gt_class = paddle.to_tensor(gt_class, place=place)
             target0 = paddle.to_tensor(target0, place=place)
             target1 = paddle.to_tensor(target1, place=place)
-            if target_num > 2:
+            if n_layers > 2:
                 target2 = paddle.to_tensor(target2, place=place)
 
             dic = {}
@@ -156,7 +157,7 @@ def read_train_data(cfg,
             dic['gt_class'] = gt_class
             dic['target0'] = target0
             dic['target1'] = target1
-            if target_num > 2:
+            if n_layers > 2:
                 dic['target2'] = target2
             train_dic['%.8d'%iter_id] = dic
 
@@ -267,7 +268,6 @@ if __name__ == '__main__':
     iter_id = 0
 
     # 创建模型
-    target_num = len(cfg.head['anchor_masks'])
     Backbone = select_backbone(cfg.backbone_type)
     backbone = Backbone(**cfg.backbone)
     IouLoss = select_loss(cfg.iou_loss_type)
@@ -341,6 +341,9 @@ if __name__ == '__main__':
 
     batch_size = cfg.train_cfg['batch_size']
     with_mixup = cfg.decodeImage['with_mixup']
+    with_cutmix = cfg.decodeImage['with_cutmix']
+    mixup_epoch = cfg.train_cfg['mixup_epoch']
+    cutmix_epoch = cfg.train_cfg['cutmix_epoch']
     context = cfg.context
     # 预处理
     # sample_transforms
@@ -378,6 +381,16 @@ if __name__ == '__main__':
             preprocess = Gt2YoloTargetSingle(**cfg.gt2YoloTarget)   # 填写target张量。
         batch_transforms.append(preprocess)
 
+    print('\n=============== sample_transforms ===============')
+    for trf in sample_transforms:
+        print('%s' % str(type(trf)))
+    print('\n=============== batch_transforms ===============')
+    for trf in batch_transforms:
+        print('%s' % str(type(trf)))
+
+    # 输出几个特征图
+    n_layers = len(cfg.head['anchor_masks'])
+
     # 保存模型的目录
     if not os.path.exists('./weights'): os.mkdir('./weights')
 
@@ -387,6 +400,18 @@ if __name__ == '__main__':
 
     # 一轮的步数。丢弃最后几个样本。
     train_steps = num_train // batch_size
+    mixup_steps = mixup_epoch * train_steps
+    cutmix_steps = cutmix_epoch * train_steps
+    print('\n=============== mixup and cutmix ===============')
+    print('steps_per_epoch: %d' % train_steps)
+    if with_mixup:
+        print('mixup_steps: %d' % mixup_steps)
+    else:
+        print('don\'t use mixup.')
+    if with_cutmix:
+        print('cutmix_steps: %d' % cutmix_steps)
+    else:
+        print('don\'t use cutmix.')
 
     # 读数据的线程
     train_dic ={}
@@ -399,7 +424,8 @@ if __name__ == '__main__':
                                  iter_id,
                                  train_dic,
                                  use_gpu,
-                                 context, with_mixup, sample_transforms, batch_transforms, target_num))
+                                 n_layers,
+                                 context, with_mixup, sample_transforms, batch_transforms))
     thr.start()
 
 
@@ -431,7 +457,7 @@ if __name__ == '__main__':
             gt_class = dic['gt_class']
             target0 = dic['target0']
             target1 = dic['target1']
-            if target_num > 2:
+            if n_layers > 2:
                 target2 = dic['target2']
                 targets = [target0, target1, target2]
             else:

@@ -50,11 +50,13 @@ class PPYOLO_2x_Config(object):
             model_path='dygraph_r50vd_ssld.pdparams',
             # model_path='./weights/1000.pdparams',
             save_iter=1000,   # 每隔几步保存一次模型
-            eval_iter=1000,   # 每隔几步计算一次eval集的mAP
+            eval_iter=20000,   # 每隔几步计算一次eval集的mAP
             max_iters=500000,   # 训练多少步
+            mixup_epoch=10,     # 前几轮进行mixup
+            cutmix_epoch=-1,    # 前几轮进行cutmix
         )
         self.learningRate = dict(
-            base_lr=0.001,
+            base_lr=0.0001,
             PiecewiseDecay=dict(
                 gamma=0.1,
                 milestones=[400000, 450000],
@@ -166,6 +168,7 @@ class PPYOLO_2x_Config(object):
         self.decodeImage = dict(
             to_rgb=True,
             with_mixup=True,
+            with_cutmix=False,
         )
         # MixupImage
         self.mixupImage = dict(
