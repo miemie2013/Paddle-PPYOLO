@@ -13,6 +13,14 @@ python -m pip install paddlepaddle_gpu==2.0.0rc0 -f https://paddlepaddle.org.cn/
 cd ~/w*
 
 
+
+# 解压预训练模型
+nvidia-smi
+cd ~/w*
+cp ../data/data64338/dygraph_yolov4_2x.pdparams ./dygraph_yolov4_2x.pdparams
+
+
+
 下载预训练模型ppyolo.pdparams
 cd ~/w*
 wget https://paddlemodels.bj.bcebos.com/object_detection/ppyolo.pdparams
