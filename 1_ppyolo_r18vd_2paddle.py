@@ -31,7 +31,6 @@ cfg = PPYOLO_r18vd_Config()
 cfg.num_classes = 80
 cfg.head['num_classes'] = cfg.num_classes
 model_path = 'ppyolo_r18vd.pdparams'
-model_path = '2000.pdparams'
 
 
 
