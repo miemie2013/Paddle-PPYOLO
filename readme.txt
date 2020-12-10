@@ -78,7 +78,13 @@ cd ~/w*
 python train.py --config=0
 
 cd ~/w*
+python train.py --config=1
+
+cd ~/w*
 python train.py --config=2
+
+cd ~/w*
+python train.py --config=3
 
 
 
@@ -88,7 +94,13 @@ cd ~/w*
 python demo.py --config=0
 
 cd ~/w*
+python demo.py --config=1
+
+cd ~/w*
 python demo.py --config=2
+
+cd ~/w*
+python demo.py --config=3
 
 
 
@@ -99,7 +111,13 @@ cd ~/w*
 python eval.py --config=0
 
 cd ~/w*
+python eval.py --config=1
+
+cd ~/w*
 python eval.py --config=2
+
+cd ~/w*
+python eval.py --config=3
 
 
 
@@ -109,7 +127,13 @@ cd ~/w*
 python test_dev.py --config=0
 
 cd ~/w*
+python test_dev.py --config=1
+
+cd ~/w*
 python test_dev.py --config=2
+
+cd ~/w*
+python test_dev.py --config=3
 
 
 

@@ -83,6 +83,7 @@ if __name__ == '__main__':
         cfg = PPYOLO_r18vd_Config()
     elif config_file == 3:
         cfg = PPYOLO_mobilenet_v3_large_Config()
+    cfg = YOLOv4_2x_Config()
 
 
     # 读取的模型

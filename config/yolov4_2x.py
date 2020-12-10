@@ -46,7 +46,7 @@ class YOLOv4_2x_Config(object):
             batch_size=24,
             num_threads=5,   # 读数据的线程数
             max_batch=3,     # 最大读多少个批
-            # model_path='dygraph_ppyolo_2x.pdparams',
+            # model_path='dygraph_yolov4_2x.pdparams',
             model_path='dygraph_r50vd_ssld.pdparams',
             # model_path='./weights/1000.pdparams',
             save_iter=1000,   # 每隔几步保存一次模型
@@ -78,7 +78,7 @@ class YOLOv4_2x_Config(object):
 
         # 验证。用于train.py、eval.py、test_dev.py
         self.eval_cfg = dict(
-            model_path='dygraph_ppyolo_2x.pdparams',
+            model_path='dygraph_yolov4_2x.pdparams',
             # model_path='./weights/1000.pdparams',
             target_size=608,
             draw_image=False,    # 是否画出验证集图片
@@ -88,7 +88,7 @@ class YOLOv4_2x_Config(object):
 
         # 测试。用于demo.py
         self.test_cfg = dict(
-            model_path='dygraph_ppyolo_2x.pdparams',
+            model_path='dygraph_yolov4_2x.pdparams',
             # model_path='./weights/1000.pdparams',
             target_size=608,
             # target_size=320,
@@ -195,8 +195,8 @@ class YOLOv4_2x_Config(object):
         )
         # NormalizeImage
         self.normalizeImage = dict(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225],
+            mean=[0., 0., 0.],
+            std=[1., 1., 1.],
             is_scale=True,
             is_channel_first=False,
         )
@@ -208,9 +208,9 @@ class YOLOv4_2x_Config(object):
         # Gt2YoloTarget
         self.gt2YoloTarget = dict(
             anchor_masks=[[6, 7, 8], [3, 4, 5], [0, 1, 2]],
-            anchors=[[10, 13], [16, 30], [33, 23],
-                     [30, 61], [62, 45], [59, 119],
-                     [116, 90], [156, 198], [373, 326]],
+            anchors=[[12, 16], [19, 36], [40, 28],
+                     [36, 75], [76, 55], [72, 146],
+                     [142, 110], [192, 243], [459, 401]],
             downsample_ratios=[32, 16, 8],
             num_classes=self.num_classes,
         )
