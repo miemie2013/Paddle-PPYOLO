@@ -93,7 +93,7 @@ def read_train_data(cfg,
                     train_dic,
                     use_gpu,
                     n_layers,
-                    context, with_mixup, sample_transforms, batch_transforms):
+                    context, with_mixup, with_cutmix, mixup_steps, cutmix_steps, sample_transforms, batch_transforms):
     iter_id = _iter_id
     num_threads = cfg.train_cfg['num_threads']
     while True:   # 无限个epoch
@@ -120,7 +120,8 @@ def read_train_data(cfg,
             target1 = [None] * batch_size
             target2 = [None] * batch_size
 
-            samples = get_samples(train_records, train_indexes, step, batch_size, with_mixup)
+            samples = get_samples(train_records, train_indexes, step, batch_size, iter_id,
+                                  with_mixup, with_cutmix, mixup_steps, cutmix_steps)
             # sample_transforms用多线程
             threads = []
             for i in range(num_threads):
@@ -425,7 +426,7 @@ if __name__ == '__main__':
                                  train_dic,
                                  use_gpu,
                                  n_layers,
-                                 context, with_mixup, sample_transforms, batch_transforms))
+                                 context, with_mixup, with_cutmix, mixup_steps, cutmix_steps, sample_transforms, batch_transforms))
     thr.start()
 
 
