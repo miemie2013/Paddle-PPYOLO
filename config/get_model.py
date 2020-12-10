@@ -10,7 +10,9 @@
 from model.losses import *
 from model.iou_losses import *
 from model.head import *
+from model.yolov4_head import *
 from model.resnet_vd import *
+from model.cspdarknet import *
 from model.mobilenet_v3 import *
 
 
@@ -21,10 +23,14 @@ def select_backbone(name):
         return Resnet18Vd
     if name == 'MobileNetV3':
         return MobileNetV3
+    if name == 'CSPDarknet53':
+        return CSPDarknet53
 
 def select_head(name):
     if name == 'YOLOv3Head':
         return YOLOv3Head
+    if name == 'YOLOv4Head':
+        return YOLOv4Head
 
 def select_loss(name):
     if name == 'YOLOv3Loss':

@@ -9,10 +9,12 @@
 # ================================================================
 from . import get_model
 from . import ppyolo_2x
+from . import yolov4_2x
 from . import ppyolo_r18vd
 from . import ppyolo_mobilenet_v3_large
 
 from .get_model import *
 from .ppyolo_2x import *
+from .yolov4_2x import *
 from .ppyolo_r18vd import *
 from .ppyolo_mobilenet_v3_large import *

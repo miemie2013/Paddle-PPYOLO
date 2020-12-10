@@ -28,12 +28,13 @@ logger = logging.getLogger(__name__)
 parser = argparse.ArgumentParser(description='Eval Script', formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument('--use_gpu', type=bool, default=True, help='whether to use gpu. True or False')
 parser.add_argument('-c', '--config', type=int, default=0,
-                    choices=[0, 1, 2],
+                    choices=[0, 1, 2, 3],
                     help=textwrap.dedent('''\
                     select one of these config files:
                     0 -- ppyolo_2x.py
-                    1 -- ppyolo_1x.py
-                    2 -- ppyolo_r18vd.py'''))
+                    1 -- yolov4_2x.py
+                    2 -- ppyolo_r18vd.py
+                    3 -- ppyolo_mobilenet_v3_large.py'''))
 args = parser.parse_args()
 config_file = args.config
 use_gpu = args.use_gpu
@@ -52,9 +53,11 @@ if __name__ == '__main__':
     if config_file == 0:
         cfg = PPYOLO_2x_Config()
     elif config_file == 1:
-        cfg = PPYOLO_2x_Config()
+        cfg = YOLOv4_2x_Config()
     elif config_file == 2:
         cfg = PPYOLO_r18vd_Config()
+    elif config_file == 3:
+        cfg = PPYOLO_mobilenet_v3_large_Config()
 
 
     # 读取的模型
