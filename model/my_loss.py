@@ -187,9 +187,8 @@ class MyLoss(object):
             "YOLOv3 output layer number not equal target number"
 
         batch_size = gt_box.shape[0]
-        loss_boxes, loss_objs, loss_clss = [], [], []
-        if self._iou_loss is not None:
-            loss_ious = []
+        loss_xys, loss_whs, loss_objs, loss_clss = [], [], [], []
+        loss_ious = []
         if self._iou_aware_loss is not None:
             loss_iou_awares = []
         for i, (output, target,
@@ -203,30 +202,83 @@ class MyLoss(object):
             output = L.transpose(output, perm=[0, 2, 3, 1])      # [N, 255, 13, 13] -> [N, 13, 13, 255]
             anchors = np.array(anchors).astype(np.float32)
             anchors = np.reshape(anchors, (-1, 2))
-            pred_bbox = self._decode(output, anchors, downsample, num_classes, scale_x_y, eps)
 
-            pred_shape = pred_bbox.shape
-            batch_size = pred_shape[0]
-            output_size = pred_shape[1]
+            # split output
+            conv_shape = output.shape
+            n_grid     = conv_shape[1]
+            conv_output = L.reshape(output, (batch_size, n_grid, n_grid, an_num, 5 + num_classes))
 
-            pred_xywh = pred_bbox[:, :, :, :, 0:4]
-            pred_conf = pred_bbox[:, :, :, :, 4:5]
-            pred_prob = pred_bbox[:, :, :, :, 5:]
+            x = conv_output[:, :, :, :, 0]   # (8, 13, 13, 3)
+            y = conv_output[:, :, :, :, 1]   # (8, 13, 13, 3)
+            w = conv_output[:, :, :, :, 2]   # (8, 13, 13, 3)
+            h = conv_output[:, :, :, :, 3]   # (8, 13, 13, 3)
+            conv_raw_conf = conv_output[:, :, :, :, 4]   # (8, 13, 13, 3)
+            conv_raw_prob = conv_output[:, :, :, :, 5:]   # (8, 13, 13, 3, 80)
+            pred_conf = L.sigmoid(conv_raw_conf)   # (8, 13, 13, 3)
+            pred_prob = L.sigmoid(conv_raw_prob)   # (8, 13, 13, 3, 80)
 
-            label_xywh = target[:, :, :, :, 0:4]
-            tobj       = target[:, :, :, :, 4:5]
-            tscale     = target[:, :, :, :, 5:6]
-            label_prob = target[:, :, :, :, 6:]
+            # split target
+            tx = target[:, :, :, :, 0]   # (8, 13, 13, 3)
+            ty = target[:, :, :, :, 1]   # (8, 13, 13, 3)
+            tw = target[:, :, :, :, 2]   # (8, 13, 13, 3)
+            th = target[:, :, :, :, 3]   # (8, 13, 13, 3)
+            tobj       = target[:, :, :, :, 4]   # (8, 13, 13, 3)
+            tscale     = target[:, :, :, :, 5]   # (8, 13, 13, 3)
+            label_prob = target[:, :, :, :, 6:]   # (8, 13, 13, 3, 80)
+            tscale_tobj = tscale * tobj   # (8, 13, 13, 3)
+
+            # loss
+            if (abs(scale_x_y - 1.0) < eps):
+                loss_x = fluid.layers.sigmoid_cross_entropy_with_logits(x, tx) * tscale_tobj
+                loss_x = fluid.layers.reduce_sum(loss_x, dim=[1, 2, 3])
+                loss_y = fluid.layers.sigmoid_cross_entropy_with_logits(y, ty) * tscale_tobj
+                loss_y = fluid.layers.reduce_sum(loss_y, dim=[1, 2, 3])
+            else:
+                dx = scale_x_y * fluid.layers.sigmoid(x) - 0.5 * (scale_x_y - 1.0)
+                dy = scale_x_y * fluid.layers.sigmoid(y) - 0.5 * (scale_x_y - 1.0)
+                loss_x = fluid.layers.abs(dx - tx) * tscale_tobj
+                loss_x = fluid.layers.reduce_sum(loss_x, dim=[1, 2, 3])
+                loss_y = fluid.layers.abs(dy - ty) * tscale_tobj
+                loss_y = fluid.layers.reduce_sum(loss_y, dim=[1, 2, 3])
+
+            # NOTE: we refined loss function of (w, h) as L1Loss
+            loss_w = fluid.layers.abs(w - tw) * tscale_tobj
+            loss_w = fluid.layers.reduce_sum(loss_w, dim=[1, 2, 3])
+            loss_h = fluid.layers.abs(h - th) * tscale_tobj
+            loss_h = fluid.layers.reduce_sum(loss_h, dim=[1, 2, 3])
+
+            # iou_loss
+            # loss_iou = self._iou_loss(x, y, w, h, tx, ty, tw, th, anchors,
+            #                           downsample, batch_size,
+            #                           scale_x_y)
+            # loss_iou = loss_iou * tscale_tobj
+            # loss_iou = fluid.layers.reduce_sum(loss_iou, dim=[1, 2, 3])
+            # loss_ious.append(fluid.layers.reduce_mean(loss_iou))
+
+            # if self._iou_aware_loss is not None:
+            #     loss_iou_aware = self._iou_aware_loss(
+            #         ioup, x, y, w, h, tx, ty, tw, th, anchors, downsample,
+            #         batch_size, scale_x_y)
+            #     loss_iou_aware = loss_iou_aware * tobj
+            #     loss_iou_aware = fluid.layers.reduce_sum(
+            #         loss_iou_aware, dim=[1, 2, 3])
+            #     loss_iou_awares.append(fluid.layers.reduce_mean(loss_iou_aware))
+
+            pred_xywh = self._decode(x, y, w, h, anchors, downsample, scale_x_y, eps)   # (8, 13, 13, 3, 4)
+            label_xywh = self._decode(tx, ty, tw, th, anchors, downsample, scale_x_y, eps, True)   # (8, 13, 13, 3, 4)
+
+            x_shape = x.shape  # (8, 13, 13, 3)
+            output_size = x_shape[1]
 
             ciou = bbox_ciou(pred_xywh, label_xywh)  # (8, 13, 13, 3)
-            ciou = L.reshape(ciou, (batch_size, output_size, output_size, 3, 1))  # (8, 13, 13, 3, 1)
 
             # 每个预测框xxxiou_loss的权重 tscale = 2 - (ground truth的面积/图片面积)
-            ciou_loss = tobj * tscale * (1 - ciou)  # 1. tobj作为mask，有物体才计算xxxiou_loss
+            ciou_loss = tscale_tobj * (1 - ciou)  # 1. tobj作为mask，有物体才计算xxxiou_loss
 
             # 2. respond_bbox作为mask，有物体才计算类别loss
             prob_pos_loss = label_prob * (0 - L.log(pred_prob + 1e-9))  # 二值交叉熵，tf中也是加了极小的常数防止nan
             prob_neg_loss = (1 - label_prob) * (0 - L.log(1 - pred_prob + 1e-9))  # 二值交叉熵，tf中也是加了极小的常数防止nan
+            tobj = L.unsqueeze(tobj, 4)   # (8, 13, 13, 3, 1)
             prob_mask = L.expand(tobj, [1, 1, 1, 1, num_classes])
             prob_loss = prob_mask * (prob_pos_loss + prob_neg_loss)
 
@@ -246,6 +298,7 @@ class MyLoss(object):
             respond_bgd = (1.0 - tobj) * L.cast(max_iou < self._ignore_thresh, 'float32')
 
             # 二值交叉熵损失
+            pred_conf = L.unsqueeze(pred_conf, 4)   # (8, 13, 13, 3, 1)
             pos_loss = tobj * (0 - L.log(pred_conf + 1e-9))
             neg_loss = respond_bgd * (0 - L.log(1 - pred_conf + 1e-9))
 
@@ -256,34 +309,36 @@ class MyLoss(object):
             ciou_loss = L.reduce_sum(ciou_loss) / batch_size
             conf_loss = L.reduce_sum(conf_loss) / batch_size
             prob_loss = L.reduce_sum(prob_loss) / batch_size
-
-            loss_boxes.append(ciou_loss)
+            loss_ious.append(ciou_loss)
             loss_objs.append(conf_loss)
             loss_clss.append(prob_loss)
 
+            loss_xys.append(fluid.layers.reduce_mean(loss_x + loss_y))
+            loss_whs.append(fluid.layers.reduce_mean(loss_w + loss_h))
+
         losses_all = {
-            "loss_box": fluid.layers.sum(loss_boxes),
+            "loss_xy": fluid.layers.sum(loss_xys),
+            "loss_wh": fluid.layers.sum(loss_whs),
             "loss_obj": fluid.layers.sum(loss_objs),
             "loss_cls": fluid.layers.sum(loss_clss),
+            "loss_iou": fluid.layers.sum(loss_ious),
         }
-        # if self._iou_loss is not None:
-        #     losses_all["loss_iou"] = fluid.layers.sum(loss_ious)
         if self._iou_aware_loss is not None:
             losses_all["loss_iou_aware"] = fluid.layers.sum(loss_iou_awares)
         return losses_all
 
-    def _decode(self, conv_output, anchors, stride, num_class, scale_x_y, eps):
-        conv_shape       = conv_output.shape
+    def _decode(self, x, y, w, h, anchors, stride, scale_x_y, eps, is_gt=False):
+        conv_shape       = x.shape   # (8, 13, 13, 3)
         batch_size       = conv_shape[0]
         n_grid           = conv_shape[1]
-        anchor_per_scale = len(anchors)
+        anchor_per_scale = conv_shape[3]
 
-        conv_output = L.reshape(conv_output, (batch_size, n_grid, n_grid, anchor_per_scale, 5 + num_class))
-
-        conv_raw_dxdy = conv_output[:, :, :, :, 0:2]
-        conv_raw_dwdh = conv_output[:, :, :, :, 2:4]
-        conv_raw_conf = conv_output[:, :, :, :, 4:5]
-        conv_raw_prob = conv_output[:, :, :, :, 5:]
+        _x = L.unsqueeze(x, 4)
+        _y = L.unsqueeze(y, 4)
+        conv_raw_dxdy = L.concat([_x, _y], -1)   # (8, 13, 13, 3, 2)
+        _w = L.unsqueeze(w, 4)
+        _h = L.unsqueeze(h, 4)
+        conv_raw_dwdh = L.concat([_w, _h], -1)   # (8, 13, 13, 3, 2)
 
         rows = L.range(0, n_grid, 1, 'float32')
         cols = L.range(0, n_grid, 1, 'float32')
@@ -293,21 +348,23 @@ class MyLoss(object):
         offset = L.reshape(offset, (1, n_grid, n_grid, 1, 2))
         offset = L.expand(offset, [batch_size, 1, 1, anchor_per_scale, 1])
 
-        if (abs(scale_x_y - 1.0) < eps):
-            pred_xy = L.sigmoid(conv_raw_dxdy)
-            pred_xy = (pred_xy + offset) * stride
+        if is_gt:
+            decode_xy = (conv_raw_dxdy + offset) / n_grid
         else:
-            # Grid Sensitive
-            pred_xy = scale_x_y * L.sigmoid(conv_raw_dxdy) - 0.5 * (scale_x_y - 1.0)
-            pred_xy = (pred_xy + offset) * stride
+            if (abs(scale_x_y - 1.0) < eps):
+                decode_xy = L.sigmoid(conv_raw_dxdy)
+                decode_xy = (decode_xy + offset) / n_grid
+            else:
+                # Grid Sensitive
+                decode_xy = scale_x_y * L.sigmoid(conv_raw_dxdy) - 0.5 * (scale_x_y - 1.0)
+                decode_xy = (decode_xy + offset) / n_grid
         anchor_t = fluid.layers.assign(np.copy(anchors).astype(np.float32))
-        pred_wh = (L.exp(conv_raw_dwdh) * anchor_t)
-        pred_xywh = L.concat([pred_xy, pred_wh], axis=-1)
+        decode_wh = (L.exp(conv_raw_dwdh) * anchor_t) / (n_grid * stride)
+        decode_xywh = L.concat([decode_xy, decode_wh], axis=-1)
+        if is_gt:
+            decode_xywh.stop_gradient = True
 
-        pred_conf = L.sigmoid(conv_raw_conf)
-        pred_prob = L.sigmoid(conv_raw_prob)
-
-        return L.concat([pred_xywh, pred_conf, pred_prob], axis=-1)
+        return decode_xywh   # (8, 13, 13, 3, 4)
 
     def _split_output(self, output, an_num, num_classes):
         """
