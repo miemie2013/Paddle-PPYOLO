@@ -156,7 +156,7 @@ if __name__ == '__main__':
             cfg.draw(im, boxes2, scores2, classes2, _clsid2cname)
 
         cv2.imwrite('%s/val/%s'%(result_dir, filename), im)
-        logger.info('Train: %d/%d' % (i, num_val))
+        logger.info('Val: %d/%d' % (i, num_val))
 
 
     logger.info('Done.')
