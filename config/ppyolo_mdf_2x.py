@@ -130,6 +130,7 @@ class PPYOLO_mdf_2x_Config(object):
             keep_prob=0.9,
             downsample=[32, 16, 8],
             in_channels=[2048, 1024, 512],
+            focalloss_on_obj=True,
         )
         self.iou_loss_type = 'IouLoss'
         self.iou_loss = dict(
@@ -150,6 +151,7 @@ class PPYOLO_mdf_2x_Config(object):
             scale_x_y=1.05,
             label_smooth=False,
             use_fine_grained_loss=True,
+            focalloss_on_obj=True,
         )
         self.nms_cfg = dict(
             nms_type='matrix_nms',

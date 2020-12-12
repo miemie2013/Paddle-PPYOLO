@@ -13,6 +13,7 @@ import paddle.nn.functional as F
 import paddle.fluid as fluid
 import paddle.fluid.layers as L
 import copy
+import math
 
 from model.custom_layers import *
 
@@ -192,6 +193,8 @@ class YOLOv3Head(paddle.nn.Layer):
                  downsample=[32, 16, 8],
                  in_channels=[2048, 1024, 512],
                  nms_cfg=None,
+                 focalloss_on_obj=False,
+                 prior_prob=0.01,
                  is_train=False
                  ):
         super(YOLOv3Head, self).__init__()
@@ -214,6 +217,8 @@ class YOLOv3Head(paddle.nn.Layer):
         self.in_channels = in_channels
         self.yolo_loss = yolo_loss
         self.nms_cfg = nms_cfg
+        self.focalloss_on_obj = focalloss_on_obj
+        self.prior_prob = prior_prob
         self.is_train = is_train
 
         _anchors = copy.deepcopy(anchors)
@@ -261,7 +266,22 @@ class YOLOv3Head(paddle.nn.Layer):
                 num_filters = len(self.anchor_masks[i]) * (self.num_classes + 6)
             else:
                 num_filters = len(self.anchor_masks[i]) * (self.num_classes + 5)
-            yolo_output_conv = Conv2dUnit(64 * (2**out_layer_num) // (2**i) * 2, num_filters, 1, stride=1, bias_attr=True, bn=0, gn=0, af=0, act=None, name="yolo_output.{}.conv".format(i))
+            bias_init = None
+            if self.focalloss_on_obj:
+                # 设置偏移的初始值使得obj预测概率初始值为self.prior_prob (根据激活函数是sigmoid()时推导出)
+                bias_init_value = -math.log((1 - self.prior_prob) / self.prior_prob)
+                bias_init_array = np.zeros((num_filters, ), np.float32)
+                an_num = len(self.anchor_masks[i])
+                start = 0
+                stride = (self.num_classes + 5)
+                if self.iou_aware:
+                    start = an_num
+                # 只设置置信位
+                for o in range(an_num):
+                    bias_init_array[start + o * stride + 4] = bias_init_value
+                bias_init = fluid.initializer.NumpyArrayInitializer(bias_init_array)
+            yolo_output_conv = Conv2dUnit(64 * (2**out_layer_num) // (2**i) * 2, num_filters, 1, stride=1, bias_attr=True, act=None,
+                                          bias_init=bias_init, name="yolo_output.{}.conv".format(i))
             self.detection_blocks.append(_detection_block)
             self.yolo_output_convs.append(yolo_output_conv)
 

@@ -39,6 +39,9 @@ class YOLOv3Loss(object):
                  iou_aware_loss=None,
                  downsample=[32, 16, 8],
                  scale_x_y=1.,
+                 focalloss_on_obj=False,
+                 focalloss_alpha=0.25,
+                 focalloss_gamma=2.0,
                  match_score=False):
         self._ignore_thresh = ignore_thresh
         self._label_smooth = label_smooth
@@ -48,6 +51,9 @@ class YOLOv3Loss(object):
         self.downsample = downsample
         self.scale_x_y = scale_x_y
         self.match_score = match_score
+        self.focalloss_on_obj = focalloss_on_obj
+        self.focalloss_alpha = focalloss_alpha
+        self.focalloss_gamma = focalloss_gamma
 
     def __call__(self, outputs, gt_box, gt_label, gt_score, targets, anchors,
                  anchor_masks, mask_anchors, num_classes):
@@ -241,14 +247,18 @@ class YOLOv3Loss(object):
         # 2. split pred bbox and gt bbox by sample, calculate IoU between pred bbox
         #    and gt bbox in each sample
         if batch_size > 1:
-            preds = fluid.layers.split(bbox, batch_size, dim=0)
-            gts = fluid.layers.split(gt_box, batch_size, dim=0)
+            # bbox:    [N, 3*n_grid*n_grid, 4]
+            # gt_box:  [N, 50, 4]
+            preds = fluid.layers.split(bbox, batch_size, dim=0)   # 里面每个元素形状是[1, 3*n_grid*n_grid, 4]
+            gts = fluid.layers.split(gt_box, batch_size, dim=0)   # 里面每个元素形状是[1, 50, 4]
         else:
             preds = [bbox]
             gts = [gt_box]
             probs = [prob]
         ious = []
         for pred, gt in zip(preds, gts):
+            # pred:   [1, 3*n_grid*n_grid, 4]
+            # gt:     [1, 50, 4]
 
             def box_xywh2xyxy(box):
                 x = box[:, 0]
@@ -263,16 +273,16 @@ class YOLOv3Loss(object):
                         y + h / 2.,
                     ], axis=1)
 
-            pred = fluid.layers.squeeze(pred, axes=[0])
-            gt = box_xywh2xyxy(fluid.layers.squeeze(gt, axes=[0]))
-            ious.append(fluid.layers.iou_similarity(pred, gt))
+            pred = fluid.layers.squeeze(pred, axes=[0])   # [3*n_grid*n_grid, 4]
+            gt = box_xywh2xyxy(fluid.layers.squeeze(gt, axes=[0]))   # [50, 4]  且转换成x0y0x1y1格式
+            ious.append(fluid.layers.iou_similarity(pred, gt))   # [3*n_grid*n_grid, 50]   两组矩形两两之间的iou
 
-        iou = fluid.layers.stack(ious, axis=0)
+        iou = fluid.layers.stack(ious, axis=0)   # [N, 3*n_grid*n_grid, 50]   两组矩形两两之间的iou
         # 3. Get iou_mask by IoU between gt bbox and prediction bbox,
         #    Get obj_mask by tobj(holds gt_score), calculate objectness loss
 
-        max_iou = fluid.layers.reduce_max(iou, dim=-1)
-        iou_mask = fluid.layers.cast(max_iou <= ignore_thresh, dtype="float32")
+        max_iou = fluid.layers.reduce_max(iou, dim=-1)   # [N, 3*n_grid*n_grid]   预测框和本图片所有gt的最高iou
+        iou_mask = fluid.layers.cast(max_iou <= ignore_thresh, dtype="float32")   # [N, 3*n_grid*n_grid]   候选负样本处为1
         if self.match_score:
             max_prob = fluid.layers.reduce_max(prob, dim=-1)
             iou_mask = iou_mask * fluid.layers.cast(
@@ -280,21 +290,31 @@ class YOLOv3Loss(object):
         output_shape = fluid.layers.shape(output)
         an_num = len(anchors) // 2
         iou_mask = fluid.layers.reshape(iou_mask, (-1, an_num, output_shape[2],
-                                                   output_shape[3]))
+                                                   output_shape[3]))   # [N, 3, n_grid, n_grid]   候选负样本处为1
         iou_mask.stop_gradient = True
 
         # NOTE: tobj holds gt_score, obj_mask holds object existence mask
-        obj_mask = fluid.layers.cast(tobj > 0., dtype="float32")
+        obj_mask = fluid.layers.cast(tobj > 0., dtype="float32")   # [N, 3, n_grid, n_grid]  正样本处为1
         obj_mask.stop_gradient = True
+
+        noobj_mask = (1.0 - obj_mask) * iou_mask   # [N, 3, n_grid, n_grid]  负样本处为1
+        noobj_mask.stop_gradient = True
 
         # For positive objectness grids, objectness loss should be calculated
         # For negative objectness grids, objectness loss is calculated only iou_mask == 1.0
-        loss_obj = fluid.layers.sigmoid_cross_entropy_with_logits(obj, obj_mask)
-        loss_obj_pos = fluid.layers.reduce_sum(loss_obj * tobj, dim=[1, 2, 3])
-        loss_obj_neg = fluid.layers.reduce_sum(
-            loss_obj * (1.0 - obj_mask) * iou_mask, dim=[1, 2, 3])
+        pred_conf = L.sigmoid(obj)
+        if self.focalloss_on_obj:
+            alpha = self.focalloss_alpha
+            gamma = self.focalloss_gamma
+            pos_loss = tobj * (0 - L.log(pred_conf + 1e-9)) * L.pow(1 - pred_conf, gamma) * alpha
+            neg_loss = noobj_mask * (0 - L.log(1 - pred_conf + 1e-9)) * L.pow(pred_conf, gamma) * (1 - alpha)
+        else:
+            pos_loss = tobj * (0 - L.log(pred_conf + 1e-9))
+            neg_loss = noobj_mask * (0 - L.log(1 - pred_conf + 1e-9))
+        pos_loss = fluid.layers.reduce_sum(pos_loss, dim=[1, 2, 3])
+        neg_loss = fluid.layers.reduce_sum(neg_loss, dim=[1, 2, 3])
 
-        return loss_obj_pos, loss_obj_neg
+        return pos_loss, neg_loss
 
 
 
