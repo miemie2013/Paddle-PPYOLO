@@ -88,13 +88,15 @@ cd ~/w*
 
 -------------------------------- PPYOLO --------------------------------
 parser.add_argument('-c', '--config', type=int, default=0,
-                    choices=[0, 1, 2, 3],
+                    choices=[0, 1, 2, 3, 4, 5],
                     help=textwrap.dedent('''\
                     select one of these config files:
                     0 -- ppyolo_2x.py
                     1 -- yolov4_2x.py
                     2 -- ppyolo_r18vd.py
-                    3 -- ppyolo_mobilenet_v3_large.py'''))
+                    3 -- ppyolo_mobilenet_v3_large.py
+                    4 -- ppyolo_mobilenet_v3_small.py
+                    5 -- ppyolo_mdf_2x.py'''))
 
 训练
 cd ~/w*
@@ -108,6 +110,12 @@ python train.py --config=2
 
 cd ~/w*
 python train.py --config=3
+
+cd ~/w*
+python train.py --config=4
+
+cd ~/w*
+python train.py --config=5
 
 
 
@@ -124,6 +132,12 @@ python demo.py --config=2
 
 cd ~/w*
 python demo.py --config=3
+
+cd ~/w*
+python demo.py --config=4
+
+cd ~/w*
+python demo.py --config=5
 
 
 
@@ -142,6 +156,12 @@ python eval.py --config=2
 cd ~/w*
 python eval.py --config=3
 
+cd ~/w*
+python eval.py --config=4
+
+cd ~/w*
+python eval.py --config=5
+
 
 
 
@@ -157,6 +177,12 @@ python test_dev.py --config=2
 
 cd ~/w*
 python test_dev.py --config=3
+
+cd ~/w*
+python test_dev.py --config=4
+
+cd ~/w*
+python test_dev.py --config=5
 
 
 
