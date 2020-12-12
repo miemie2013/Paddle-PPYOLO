@@ -117,7 +117,7 @@ class YOLOv4_2x_Config(object):
                      [36, 75], [76, 55], [72, 146],
                      [142, 110], [192, 243], [459, 401]],
             coord_conv=True,
-            iou_aware=False,
+            iou_aware=True,
             iou_aware_factor=0.4,
             scale_x_y=1.05,
             spp=True,
@@ -139,7 +139,7 @@ class YOLOv4_2x_Config(object):
             max_height=608,
             max_width=608,
         )
-        self.yolo_loss_type = 'MyLoss'
+        self.yolo_loss_type = 'YOLOv3Loss'
         self.yolo_loss = dict(
             ignore_thresh=0.7,
             scale_x_y=1.05,
