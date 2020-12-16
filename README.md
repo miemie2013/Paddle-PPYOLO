@@ -19,10 +19,20 @@ Paddle2.0动态图版本的PPYOLO，训练速度约为PaddleDetection原版的92
 ```
 (2)使用模型预测图片、获取FPS（预测images/test/里的图片，结果保存在images/res/）
 ```
-! cd ~/work; python demo.py
+! cd ~/work; python demo.py --config=0
 ```
-
-是不是很简单？
+--config=0表示使用了0号配置文件ppyolo_2x.py，配置文件代号与配置文件的对应关系在tools/argparser.py文件里：
+parser.add_argument('-c', '--config', type=int, default=0,
+                    choices=[0, 1, 2, 3, 4, 5],
+                    help=textwrap.dedent('''\
+                    select one of these config files:
+                    0 -- ppyolo_2x.py
+                    1 -- yolov4_2x.py
+                    2 -- ppyolo_r18vd.py
+                    3 -- ppyolo_mobilenet_v3_large.py
+                    4 -- ppyolo_mobilenet_v3_small.py
+                    5 -- ppyolo_mdf_2x.py'''))
+train.py、eval.py、demo.py、test_dev.py都需要指定--config参数表示使用哪个配置文件，后面不再赘述。
 
 
 ## 训练
@@ -51,7 +61,7 @@ Paddle2.0动态图版本的PPYOLO，训练速度约为PaddleDetection原版的92
 再输入以下命令训练（所有的配置都在config/ppyolo_2x.py里，请查看代码注释做相应修改。如果你抢到32GB的V100，可以开batch_size=24，否则请调小batch_size。使用的预训练模型是config/ppyolo_2x.py里self.train_cfg -> model_path指定的模型）
 
 ```
-! cd ~/work; python train.py
+! cd ~/work; python train.py --config=0
 ```
 
 
@@ -73,7 +83,7 @@ xxx.jpg 48,240,195,371,11 8,12,352,498,14
 运行以下命令。评测的模型是config/ppyolo_2x.py里self.eval_cfg -> model_path指定的模型
 
 ```
-! cd ~/work; python eval.py
+! cd ~/work; python eval.py --config=0
 ```
 
 该mAP是val集的结果。
@@ -82,7 +92,7 @@ xxx.jpg 48,240,195,371,11 8,12,352,498,14
 运行以下命令。使用的模型是config/ppyolo_2x.py里self.test_cfg -> model_path指定的模型
 
 ```
-! cd ~/work; python demo.py
+! cd ~/work; python demo.py --config=0
 ```
 
 喜欢的话点个喜欢或者关注我哦~

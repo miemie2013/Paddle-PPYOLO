@@ -384,30 +384,17 @@ class YOLOv3Head(paddle.nn.Layer):
 
         # nms
         preds = []
-        nms_type = self.nms_cfg['nms_type']
+        nms_cfg = copy.deepcopy(self.nms_cfg)
+        nms_type = nms_cfg.pop('nms_type')
+        batch_size = yolo_boxes.shape[0]
         if nms_type == 'matrix_nms':
-            batch_size = yolo_boxes.shape[0]
-            if batch_size == 1:
-                pred = fluid.layers.matrix_nms(yolo_boxes, yolo_scores,
-                                               score_threshold=self.nms_cfg['score_threshold'],
-                                               post_threshold=self.nms_cfg['post_threshold'],
-                                               nms_top_k=self.nms_cfg['nms_top_k'],
-                                               keep_top_k=self.nms_cfg['keep_top_k'],
-                                               use_gaussian=self.nms_cfg['use_gaussian'],
-                                               gaussian_sigma=self.nms_cfg['gaussian_sigma'],
-                                               background_label=-1)
+            for i in range(batch_size):
+                pred = fluid.layers.matrix_nms(yolo_boxes[i:i+1, :, :], yolo_scores[i:i+1, :, :], background_label=-1, **nms_cfg)
                 preds.append(pred)
-            else:
-                for i in range(batch_size):
-                    pred = fluid.layers.matrix_nms(yolo_boxes[i:i+1, :, :], yolo_scores[i:i+1, :, :],
-                                                   score_threshold=self.nms_cfg['score_threshold'],
-                                                   post_threshold=self.nms_cfg['post_threshold'],
-                                                   nms_top_k=self.nms_cfg['nms_top_k'],
-                                                   keep_top_k=self.nms_cfg['keep_top_k'],
-                                                   use_gaussian=self.nms_cfg['use_gaussian'],
-                                                   gaussian_sigma=self.nms_cfg['gaussian_sigma'],
-                                                   background_label=-1)
-                    preds.append(pred)
+        elif nms_type == 'multiclass_nms':
+            for i in range(batch_size):
+                pred = fluid.layers.multiclass_nms(yolo_boxes[i:i+1, :, :], yolo_scores[i:i+1, :, :], background_label=-1, **nms_cfg)
+                preds.append(pred)
         return preds
 
 
