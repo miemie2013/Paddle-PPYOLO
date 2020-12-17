@@ -35,6 +35,40 @@ parser.add_argument('-c', '--config', type=int, default=0,
 train.py、eval.py、demo.py、test_dev.py都需要指定--config参数表示使用哪个配置文件，后面不再赘述。
 
 
+## 数据集的放置位置
+如果不是在AIStudio上训练，而是在个人电脑上训练，数据集应该和本项目位于同一级目录(同时需要修改一下配置文件中self.train_path、self.val_path这些参数使其指向数据集)。一个示例：
+```
+D://GitHub
+     |------COCO
+     |        |------annotations
+     |        |------test2017
+     |        |------train2017
+     |        |------val2017
+     |
+     |------VOCdevkit
+     |        |------VOC2007
+     |        |        |------Annotations
+     |        |        |------ImageSets
+     |        |        |------JPEGImages
+     |        |        |------SegmentationClass
+     |        |        |------SegmentationObject
+     |        |
+     |        |------VOC2012
+     |                 |------Annotations
+     |                 |------ImageSets
+     |                 |------JPEGImages
+     |                 |------SegmentationClass
+     |                 |------SegmentationObject
+     |
+     |------Paddle-PPYOLO-master
+              |------annotation
+              |------config
+              |------data
+              |------model
+              |------...
+```
+
+
 ## 训练
 
 如果你需要训练COCO2017数据集，那么需要先解压数据集
@@ -74,9 +108,11 @@ xxx.jpg 18.19,6.32,424.13,421.83,20 323.86,2.65,640.0,421.94,20
 xxx.jpg 48,240,195,371,11 8,12,352,498,14
 # 图片名 物体1左上角x坐标,物体1左上角y坐标,物体1右下角x坐标,物体1右下角y坐标,物体1类别id 物体2左上角x坐标,物体2左上角y坐标,物体2右下角x坐标,物体2右下角y坐标,物体2类别id ...
 ```
+注意：xxx.jpg仅仅是文件名而不是文件的路径！xxx.jpg仅仅是文件名而不是文件的路径！xxx.jpg仅仅是文件名而不是文件的路径！
+
 运行1_txt2json.py会在annotation_json目录下生成两个coco注解风格的json注解文件，这是train.py支持的注解文件格式。
 在config/ppyolo_2x.py里修改train_path、val_path、classes_path、train_pre_path、val_pre_path、num_classes这6个变量（自带的voc2012数据集直接解除注释就ok了）,就可以开始训练自己的数据集了。
-而且，直接加载dygraph_ppyolo_2x.pdparams的权重（即配置文件里修改train_cfg的model_path为'dygraph_ppyolo_2x'）训练也是可以的，这时候也仅仅不加载3个输出卷积层的6个权重（因为类别数不同导致了输出通道数不同）。
+而且，直接加载dygraph_ppyolo_2x.pdparams的权重（即配置文件里修改train_cfg的model_path为'dygraph_ppyolo_2x.pdparams'）训练也是可以的，这时候也仅仅不加载3个输出卷积层的6个权重（因为类别数不同导致了输出通道数不同）。
 如果需要跑demo.py、eval.py，与数据集有关的变量也需要修改一下，应该很容易看懂。
 
 ## 评估
