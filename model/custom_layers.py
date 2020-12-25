@@ -119,6 +119,134 @@ def deformable_conv(input,
 
 
 
+def dcnv2(input,
+                    offset,
+                    mask,
+                    num_filters,
+                    filter_size,
+                    stride=1,
+                    padding=0,
+                    dilation=1,
+                    groups=None,
+                    deformable_groups=None,
+                    im2col_step=None,
+                    filter_param=None,
+                    bias_attr=None,
+                    modulated=True,
+                    name=None):
+    x = input
+    dcn_weight = filter_param
+    N, in_C, H, W = x.shape
+    out_C, in_C, kH, kW = dcn_weight.shape
+    out_W = (W + 2 * padding - (kW - 1)) // stride
+    out_H = (H + 2 * padding - (kH - 1)) // stride
+
+    # 1.先对图片x填充得到填充后的图片pad_x
+    # pad_x_H = H + padding * 2 + 1
+    # pad_x_W = W + padding * 2 + 1
+    pad_x = L.pad(x, paddings=[0, 0, 0, 0, padding, padding+1, padding, padding+1], pad_value=0.0)
+
+    # 卷积核中心点在pad_x中的位置
+    rows = L.range(0., out_W, 1., dtype='float32') * stride + padding     # [out_W, ]
+    cols = L.range(0., out_H, 1., dtype='float32') * stride + padding     # [out_H, ]
+    rows = L.expand(L.reshape(rows, (1, 1, -1, 1, 1)), [1, out_H, 1, 1, 1])   # [1, out_H, out_W, 1, 1]
+    cols = L.expand(L.reshape(cols, (1, -1, 1, 1, 1)), [1, 1, out_W, 1, 1])   # [1, out_H, out_W, 1, 1]
+    start_pos_yx = L.concat([cols, rows], -1)   # [1, out_H, out_W, 1, 2]   仅仅是卷积核中心点在pad_x中的位置
+    start_pos_yx = L.expand(start_pos_yx, [N, 1, 1, kH * kW, 1])   # [N, out_H, out_W, kH*kW, 2]   仅仅是卷积核中心点在pad_x中的位置
+    start_pos_y = start_pos_yx[:, :, :, :, :1]  # [N, out_H, out_W, kH*kW, 1]   仅仅是卷积核中心点在pad_x中的位置
+    start_pos_x = start_pos_yx[:, :, :, :, 1:]  # [N, out_H, out_W, kH*kW, 1]   仅仅是卷积核中心点在pad_x中的位置
+
+    # 卷积核内部的偏移
+    half_W = (kW - 1) // 2
+    half_H = (kW - 1) // 2
+    rows2 = L.range(0., kW, 1., dtype='float32') - half_W
+    cols2 = L.range(0., kH, 1., dtype='float32') - half_H
+    rows2 = L.expand(L.reshape(rows2, (1, -1, 1)), [kH, 1, 1])
+    cols2 = L.expand(L.reshape(cols2, (-1, 1, 1)), [1, kW, 1])
+    filter_inner_offset_yx = L.concat([cols2, rows2], -1)  # [kH, kW, 2]   卷积核内部的偏移
+    filter_inner_offset_yx = L.reshape(filter_inner_offset_yx,
+                                       (1, 1, 1, kH * kW, 2))  # [1, 1, 1, kH*kW, 2]   卷积核内部的偏移
+    filter_inner_offset_yx = L.expand(filter_inner_offset_yx, [N, out_H, out_W, 1, 1])  # [N, out_H, out_W, kH*kW, 2]   卷积核内部的偏移
+    filter_inner_offset_y = filter_inner_offset_yx[:, :, :, :, :1]  # [N, out_H, out_W, kH*kW, 1]   卷积核内部的偏移
+    filter_inner_offset_x = filter_inner_offset_yx[:, :, :, :, 1:]  # [N, out_H, out_W, kH*kW, 1]   卷积核内部的偏移
+
+    mask = L.transpose(mask, [0, 2, 3, 1])  # [N, out_H, out_W, kH*kW*1]
+    offset = L.transpose(offset, [0, 2, 3, 1])  # [N, out_H, out_W, kH*kW*2]
+    offset_yx = L.reshape(offset, (N, out_H, out_W, kH * kW, 2))  # [N, out_H, out_W, kH*kW, 2]
+    offset_y = offset_yx[:, :, :, :, :1]  # [N, out_H, out_W, kH*kW, 1]
+    offset_x = offset_yx[:, :, :, :, 1:]  # [N, out_H, out_W, kH*kW, 1]
+
+    # 最终位置
+    pos_y = start_pos_y + filter_inner_offset_y + offset_y  # [N, out_H, out_W, kH*kW, 1]
+    pos_x = start_pos_x + filter_inner_offset_x + offset_x  # [N, out_H, out_W, kH*kW, 1]
+    pos_y = L.clip(pos_y, 0.0, H + padding * 2 - 1.0)
+    pos_x = L.clip(pos_x, 0.0, W + padding * 2 - 1.0)
+    ytxt = L.concat([pos_y, pos_x], -1)  # [N, out_H, out_W, kH*kW, 2]
+
+    pad_x = L.transpose(pad_x, [0, 2, 3, 1])  # [N, pad_x_H, pad_x_W, C]
+
+    new_x = L.zeros((N, out_H, out_W, in_C, kH, kW), 'float32')
+
+    mask = L.reshape(mask, (N, out_H, out_W, kH, kW))  # [N, out_H, out_W, kH, kW]
+
+    for bid in range(N):
+        pad_x2 = pad_x[bid]  # [pad_x_H, pad_x_W, in_C]
+        mask2 = mask[bid]  # [out_H, out_W, kH, kW]
+        _ytxt = ytxt[bid]  # [out_H, out_W, kH*kW, 2]
+
+        _ytxt = L.reshape(_ytxt, (out_H * out_W * kH * kW, 2))  # [out_H*out_W*kH*kW, 2]
+        _yt = _ytxt[:, :1]
+        _xt = _ytxt[:, 1:]
+        _y1 = L.floor(_yt)
+        _x1 = L.floor(_xt)
+        _y2 = _y1 + 1.0
+        _x2 = _x1 + 1.0
+        _y1x1 = L.concat([_y1, _x1], -1)
+        _y1x2 = L.concat([_y1, _x2], -1)
+        _y2x1 = L.concat([_y2, _x1], -1)
+        _y2x2 = L.concat([_y2, _x2], -1)
+
+        _y1x1_int = L.cast(_y1x1, 'int32')  # [out_H*out_W*kH*kW, 2]
+        v1 = L.gather_nd(pad_x2, _y1x1_int)  # [out_H*out_W*kH*kW, in_C]
+        _y1x2_int = L.cast(_y1x2, 'int32')  # [out_H*out_W*kH*kW, 2]
+        v2 = L.gather_nd(pad_x2, _y1x2_int)  # [out_H*out_W*kH*kW, in_C]
+        _y2x1_int = L.cast(_y2x1, 'int32')  # [out_H*out_W*kH*kW, 2]
+        v3 = L.gather_nd(pad_x2, _y2x1_int)  # [out_H*out_W*kH*kW, in_C]
+        _y2x2_int = L.cast(_y2x2, 'int32')  # [out_H*out_W*kH*kW, 2]
+        v4 = L.gather_nd(pad_x2, _y2x2_int)  # [out_H*out_W*kH*kW, in_C]
+
+        lh = _yt - _y1  # [out_H*out_W*kH*kW, 1]
+        lw = _xt - _x1
+        hh = 1 - lh
+        hw = 1 - lw
+        w1 = hh * hw
+        w2 = hh * lw
+        w3 = lh * hw
+        w4 = lh * lw
+        value = w1 * v1 + w2 * v2 + w3 * v3 + w4 * v4  # [out_H*out_W*kH*kW, in_C]
+        mask2 = L.reshape(mask2, (out_H * out_W * kH * kW, 1))
+        value = value * mask2
+        value = L.reshape(value, (out_H, out_W, kH, kW, in_C))
+        value = L.transpose(value, [0, 1, 4, 2, 3])
+        new_x[bid, :, :, :, :, :] = value
+
+    # 旧的方案，使用逐元素相乘，慢！
+    # new_x = torch.reshape(new_x, (N, out_H, out_W, in_C * kH * kW))  # [N, out_H, out_W, in_C * kH * kW]
+    # new_x = new_x.permute(0, 3, 1, 2)  # [N, in_C*kH*kW, out_H, out_W]
+    # exp_new_x = new_x.unsqueeze(1)  # 增加1维，[N,      1, in_C*kH*kW, out_H, out_W]
+    # reshape_w = torch.reshape(dcn_weight, (1, out_C, in_C * kH * kW, 1, 1))  # [1, out_C,  in_C*kH*kW,     1,     1]
+    # out = exp_new_x * reshape_w  # 逐元素相乘，[N, out_C,  in_C*kH*kW, out_H, out_W]
+    # out = out.sum((2,))  # 第2维求和，[N, out_C, out_H, out_W]
+
+    # 新的方案，用等价的1x1卷积代替逐元素相乘，快！
+    new_x = L.reshape(new_x, (N, out_H, out_W, in_C * kH * kW))  # [N, out_H, out_W, in_C * kH * kW]
+    new_x = L.transpose(new_x, [0, 3, 1, 2])  # [N, in_C*kH*kW, out_H, out_W]
+    rw = L.reshape(dcn_weight, (out_C, in_C * kH * kW, 1, 1))  # [out_C, in_C, kH, kW] -> [out_C, in_C*kH*kW, 1, 1]  变成1x1卷积核
+    out = F.conv2d(new_x, rw, stride=1)  # [N, out_C, out_H, out_W]
+    return out
+
+
+
 def get_norm(norm_type):
     bn = 0
     gn = 0
@@ -309,6 +437,16 @@ class Conv2dUnit(paddle.nn.Layer):
                                 im2col_step=1,
                                 filter_param=self.dcn_param,
                                 bias_attr=False)
+            # x = dcnv2(input=x, offset=offset, mask=mask,
+            #                     num_filters=self.filters,
+            #                     filter_size=self.filter_size,
+            #                     stride=self.stride,
+            #                     padding=self.padding,
+            #                     groups=1,
+            #                     deformable_groups=1,
+            #                     im2col_step=1,
+            #                     filter_param=self.dcn_param,
+            #                     bias_attr=False)
         else:
             x = self.conv(x)
         if self.bn:
