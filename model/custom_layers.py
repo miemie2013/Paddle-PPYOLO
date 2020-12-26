@@ -134,6 +134,9 @@ def dcnv2(input,
                     bias_attr=None,
                     modulated=True,
                     name=None):
+    '''
+    @Author: https://github.com/miemie2013
+    '''
     x = input
     dcn_weight = filter_param
     N, in_C, H, W = x.shape
