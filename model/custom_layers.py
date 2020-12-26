@@ -196,7 +196,7 @@ def dcnv2(input,
 
     # 为了避免使用for循环遍历每一张图片，还要给y坐标（代表行号）加上图片的偏移来一次性抽取出更兴趣的像素。
     row_offset = L.range(0., N, 1., dtype='float32') * pad_x_H  # [N, ]
-    row_offset = L.expand(L.reshape(row_offset, (-1, 1, 1)), [1, out_H*out_W*kH*kW, 1])  # [N, out_H*out_W*kH*kW, 1]
+    row_offset = L.expand(L.reshape(row_offset, (-1, 1, 1)), [1, out_H * out_W * kH * kW, 1])  # [N, out_H*out_W*kH*kW, 1]
     row_offset = L.reshape(row_offset, (N * out_H * out_W * kH * kW, 1))  # [N*out_H*out_W*kH*kW, 1]
     row_offset.stop_gradient = True
     _yt += row_offset
@@ -440,6 +440,8 @@ class Conv2dUnit(paddle.nn.Layer):
                                 im2col_step=1,
                                 filter_param=self.dcn_param,
                                 bias_attr=False)
+
+            # 自实现的DCNv2
             # x = dcnv2(input=x, offset=offset, mask=mask,
             #                     num_filters=self.filters,
             #                     filter_size=self.filter_size,
