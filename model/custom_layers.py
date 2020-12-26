@@ -236,15 +236,7 @@ def dcnv2(input,
     value = L.reshape(value, (N, out_H, out_W, kH, kW, in_C))
     new_x = L.transpose(value, [0, 1, 2, 5, 3, 4])   # [N, out_H, out_W, in_C, kH, kW]
 
-    # 旧的方案，使用逐元素相乘，慢！
-    # new_x = torch.reshape(new_x, (N, out_H, out_W, in_C * kH * kW))  # [N, out_H, out_W, in_C * kH * kW]
-    # new_x = new_x.permute(0, 3, 1, 2)  # [N, in_C*kH*kW, out_H, out_W]
-    # exp_new_x = new_x.unsqueeze(1)  # 增加1维，[N,      1, in_C*kH*kW, out_H, out_W]
-    # reshape_w = torch.reshape(dcn_weight, (1, out_C, in_C * kH * kW, 1, 1))  # [1, out_C,  in_C*kH*kW,     1,     1]
-    # out = exp_new_x * reshape_w  # 逐元素相乘，[N, out_C,  in_C*kH*kW, out_H, out_W]
-    # out = out.sum((2,))  # 第2维求和，[N, out_C, out_H, out_W]
-
-    # 新的方案，用等价的1x1卷积代替逐元素相乘，快！
+    # 1x1卷积
     new_x = L.reshape(new_x, (N, out_H, out_W, in_C * kH * kW))  # [N, out_H, out_W, in_C * kH * kW]
     new_x = L.transpose(new_x, [0, 3, 1, 2])  # [N, in_C*kH*kW, out_H, out_W]
     rw = L.reshape(dcn_weight, (out_C, in_C * kH * kW, 1, 1))  # [out_C, in_C, kH, kW] -> [out_C, in_C*kH*kW, 1, 1]  变成1x1卷积核
