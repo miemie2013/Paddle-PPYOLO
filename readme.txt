@@ -96,7 +96,8 @@ parser.add_argument('-c', '--config', type=int, default=0,
                     2 -- ppyolo_r18vd.py
                     3 -- ppyolo_mobilenet_v3_large.py
                     4 -- ppyolo_mobilenet_v3_small.py
-                    5 -- ppyolo_mdf_2x.py'''))
+                    5 -- ppyolo_mdf_2x.py
+                    6 -- ppyolo_large_2x.py'''))
 
 训练
 cd ~/w*

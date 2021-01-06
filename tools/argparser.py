@@ -25,7 +25,8 @@ class ArgParser(object):
                             2 -- ppyolo_r18vd.py
                             3 -- ppyolo_mobilenet_v3_large.py
                             4 -- ppyolo_mobilenet_v3_small.py
-                            5 -- ppyolo_mdf_2x.py'''))
+                            5 -- ppyolo_mdf_2x.py
+                            6 -- ppyolo_large_2x.py'''))
         self.args = parser.parse_args()
         self.config_file = self.args.config
         self.use_gpu = self.args.use_gpu
@@ -48,6 +49,8 @@ class ArgParser(object):
             cfg = PPYOLO_mobilenet_v3_large_Config()
         elif config_file == 5:
             cfg = PPYOLO_mdf_2x_Config()
+        elif config_file == 6:
+            cfg = PPYOLO_large_2x_Config()
         return cfg
 
 
