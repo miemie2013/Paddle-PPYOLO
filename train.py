@@ -198,7 +198,10 @@ def calc_lr(iter_id, cfg):
         return base_lr * factor
     return base_lr
 
-
+def write(filename, logstats):
+    with open(filename, 'a', encoding='utf-8') as f:
+        f.writelines(logstats + '\n')
+        f.close
 
 if __name__ == '__main__':
     parser = ArgParser()
@@ -407,6 +410,8 @@ if __name__ == '__main__':
     thr.start()
 
 
+    nowTime = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+    log_filename = 'log%s.txt'%nowTime
     best_ap_list = [0.0, 0]  #[map, iter]
     while True:   # 无限个epoch
         for step in range(train_steps):
@@ -459,7 +464,7 @@ if __name__ == '__main__':
                 ema.update()   # 更新ema字典
 
             # ==================== log ====================
-            if iter_id % 20 == 0:
+            if iter_id % cfg.train_cfg['log_iter'] == 0:
                 speed = (1.0 / time_cost)
                 speed *= batch_size
                 speed_msg = '%.3f imgs/s.' % (speed,)
@@ -470,6 +475,7 @@ if __name__ == '__main__':
                     each_loss += ' %s: %.3f,' % (loss_name, loss_value)
                 strs = 'Train iter: {}, lr: {:.9f}, all_loss: {:.3f},{} eta: {}, speed: {}'.format(iter_id, lr, _all_loss, each_loss, eta, speed_msg)
                 logger.info(strs)
+                write(log_filename, strs)
 
             # ==================== save ====================
             if iter_id % cfg.train_cfg['save_iter'] == 0:
