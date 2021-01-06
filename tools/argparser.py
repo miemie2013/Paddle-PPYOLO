@@ -17,7 +17,7 @@ class ArgParser(object):
         parser = argparse.ArgumentParser(description='Script', formatter_class=argparse.RawTextHelpFormatter)
         parser.add_argument('--use_gpu', type=bool, default=True, help='whether to use gpu. True or False')
         parser.add_argument('-c', '--config', type=int, default=0,
-                            choices=[0, 1, 2, 3, 4, 5],
+                            choices=[0, 1, 2, 3, 4, 5, 6],
                             help=textwrap.dedent('''\
                             select one of these config files:
                             0 -- ppyolo_2x.py
