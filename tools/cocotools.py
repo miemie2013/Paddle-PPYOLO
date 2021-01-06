@@ -156,7 +156,8 @@ def read_eval_data(images,
         dic['batch_im_size'] = batch_im_size
         eval_dic['%.8d' % i] = dic
 
-def multi_thread_write_json(j, result_image, result_boxes, result_scores, result_classes, batch_im_id, batch_im_name, _clsid2catid, draw_image, result_dir):
+
+def write_json(j, bbox_data, result_image, result_boxes, result_scores, result_classes, batch_im_id, batch_im_name, _clsid2catid, draw_image, result_dir):
     image = result_image[j]
     boxes = result_boxes[j]
     scores = result_scores[j]
@@ -165,7 +166,6 @@ def multi_thread_write_json(j, result_image, result_boxes, result_scores, result
         im_id = batch_im_id[j]
         im_name = batch_im_name[j]
         n = len(boxes)
-        bbox_data = []
         for p in range(n):
             clsid = classes[p]
             score = scores[p]
@@ -184,11 +184,8 @@ def multi_thread_write_json(j, result_image, result_boxes, result_scores, result
                 'score': float(score)
             }
             bbox_data.append(bbox_res)
-        path = '%s/bbox/%s.json' % (result_dir, im_name.split('.')[0])
         if draw_image:
             cv2.imwrite('%s/images/%s' % (result_dir, im_name), image)
-        with open(path, 'w') as f:
-            json.dump(bbox_data, f)
 
 
 
@@ -226,6 +223,7 @@ def eval(_decode, images, eval_pre_path, anno_file, eval_batch_size, _clsid2cati
                                  num_steps,
                                  eval_dic))
     thr.start()
+    bbox_data = []
     for i in range(num_steps):
         key_list = list(eval_dic.keys())
         key_len = len(key_list)
@@ -246,11 +244,17 @@ def eval(_decode, images, eval_pre_path, anno_file, eval_batch_size, _clsid2cati
             batch_size = n - (num_steps - 1) * eval_batch_size
 
         for j in range(batch_size):
-            t = threading.Thread(target=multi_thread_write_json,
-                                 args=(j, result_image, result_boxes, result_scores, result_classes, batch_im_id, batch_im_name, _clsid2catid, draw_image, result_dir))
-            t.start()
-        if i % 100 == 0:
-            logger.info('Test iter {}'.format(i))
+            write_json(j, bbox_data, result_image, result_boxes, result_scores, result_classes, batch_im_id, batch_im_name, _clsid2catid, draw_image, result_dir)
+        if (i+1) % 100 == 0:
+            path = '%s/bbox/%d.json' % (result_dir, i+1)
+            with open(path, 'w') as f:
+                json.dump(bbox_data, f)
+            bbox_data = []
+            logger.info('Test iter {}'.format(i+1))
+    if len(bbox_data) > 0:
+        path = '%s/bbox/last.json' % (result_dir, )
+        with open(path, 'w') as f:
+            json.dump(bbox_data, f)
     logger.info('Test Done.')
     cost = time.time() - start
     logger.info('total time: {0:.6f}s'.format(cost))
