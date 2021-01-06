@@ -118,6 +118,9 @@ python train.py --config=4
 cd ~/w*
 python train.py --config=5
 
+cd ~/w*
+python train.py --config=6
+
 
 
 
@@ -139,6 +142,9 @@ python demo.py --config=4
 
 cd ~/w*
 python demo.py --config=5
+
+cd ~/w*
+python demo.py --config=6
 
 
 
@@ -163,6 +169,9 @@ python eval.py --config=4
 cd ~/w*
 python eval.py --config=5
 
+cd ~/w*
+python eval.py --config=6
+
 
 
 
@@ -184,6 +193,9 @@ python test_dev.py --config=4
 
 cd ~/w*
 python test_dev.py --config=5
+
+cd ~/w*
+python test_dev.py --config=6
 
 
 
