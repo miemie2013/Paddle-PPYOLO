@@ -486,6 +486,7 @@ if __name__ == '__main__':
                 if cfg.use_ema:
                     ema.restore()
                 logger.info('Save model to {}'.format(save_path))
+                write(log_filename, 'Save model to {}'.format(save_path))
                 clear_model('weights')
 
             # ==================== eval ====================
@@ -501,19 +502,34 @@ if __name__ == '__main__':
 
                 # 以box_ap作为标准
                 ap = box_ap
+                write(log_filename, 'Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = %.3f' % (box_ap[0], ))
+                write(log_filename, 'Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = %.3f' % (box_ap[1], ))
+                write(log_filename, 'Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = %.3f' % (box_ap[2], ))
+                write(log_filename, 'Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = %.3f' % (box_ap[3], ))
+                write(log_filename, 'Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = %.3f' % (box_ap[4], ))
+                write(log_filename, 'Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = %.3f' % (box_ap[5], ))
+                write(log_filename, 'Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = %.3f' % (box_ap[6], ))
+                write(log_filename, 'Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = %.3f' % (box_ap[7], ))
+                write(log_filename, 'Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = %.3f' % (box_ap[8], ))
+                write(log_filename, 'Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = %.3f' % (box_ap[9], ))
+                write(log_filename, 'Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = %.3f' % (box_ap[10], ))
+                write(log_filename, 'Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = %.3f' % (box_ap[11], ))
                 if ap[0] > best_ap_list[0]:
                     best_ap_list[0] = ap[0]
                     best_ap_list[1] = iter_id
                     save_path = './weights/best_model.pdparams'
                     paddle.save(model.state_dict(), save_path)
                     logger.info('Save model to {}'.format(save_path))
+                    write(log_filename, 'Save model to {}'.format(save_path))
                     clear_model('weights')
                 if cfg.use_ema:
                     ema.restore()
                 logger.info("Best test ap: {}, in iter: {}".format(best_ap_list[0], best_ap_list[1]))
+                write(log_filename, "Best test ap: {}, in iter: {}".format(best_ap_list[0], best_ap_list[1]))
 
             # ==================== exit ====================
             if iter_id == cfg.train_cfg['max_iters']:
                 logger.info('Done.')
+                write(log_filename, 'Done.')
                 exit(0)
 
