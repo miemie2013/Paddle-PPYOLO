@@ -9,6 +9,7 @@
 # ================================================================
 import paddle
 import paddle.fluid.layers as L
+import math
 
 
 
@@ -38,16 +39,76 @@ def _iou(box_a, box_b):
     inter = L.relu(max_xy - min_xy)
     inter = inter[:, :, 0] * inter[:, :, 1]
 
-    area_a = (box_a[:, 2]-box_a[:, 0]) * (box_a[:, 3]-box_a[:, 1])
+    box_a_w = box_a[:, 2]-box_a[:, 0]
+    box_a_h = box_a[:, 3]-box_a[:, 1]
+    area_a = box_a_h * box_a_w
     area_a = L.reshape(area_a, (A, 1))
     area_a = L.expand(area_a, [1, B])  # [A, B]
 
-    area_b = (box_b[:, 2]-box_b[:, 0]) * (box_b[:, 3]-box_b[:, 1])
+    box_b_w = box_b[:, 2]-box_b[:, 0]
+    box_b_h = box_b[:, 3]-box_b[:, 1]
+    area_b = box_b_h * box_b_w
     area_b = L.reshape(area_b, (1, B))
     area_b = L.expand(area_b, [A, 1])  # [A, B]
 
     union = area_a + area_b - inter
     return inter / union  # [A, B]
+
+
+def _iou_hw(box_a, box_b, eps=1e-9):
+    """计算两组矩形两两之间的iou以及长宽比信息
+    Args:
+        box_a: (tensor) bounding boxes, Shape: [A, 4].
+        box_b: (tensor) bounding boxes, Shape: [B, 4].
+    Return:
+      (tensor) iou, Shape: [A, B].
+    """
+    A = box_a.shape[0]
+    B = box_b.shape[0]
+
+    box_a_rb = L.reshape(box_a[:, 2:], (A, 1, 2))
+    box_a_rb = L.expand(box_a_rb, [1, B, 1])
+    box_b_rb = L.reshape(box_b[:, 2:], (1, B, 2))
+    box_b_rb = L.expand(box_b_rb, [A, 1, 1])
+    max_xy = L.elementwise_min(box_a_rb, box_b_rb)
+
+    box_a_lu = L.reshape(box_a[:, :2], (A, 1, 2))
+    box_a_lu = L.expand(box_a_lu, [1, B, 1])
+    box_b_lu = L.reshape(box_b[:, :2], (1, B, 2))
+    box_b_lu = L.expand(box_b_lu, [A, 1, 1])
+    min_xy = L.elementwise_max(box_a_lu, box_b_lu)
+
+    inter = L.relu(max_xy - min_xy)
+    inter = inter[:, :, 0] * inter[:, :, 1]
+
+    box_a_w = box_a[:, 2]-box_a[:, 0]
+    box_a_h = box_a[:, 3]-box_a[:, 1]
+    area_a = box_a_h * box_a_w
+    area_a = L.reshape(area_a, (A, 1))
+    area_a = L.expand(area_a, [1, B])  # [A, B]
+
+    box_b_w = box_b[:, 2]-box_b[:, 0]
+    box_b_h = box_b[:, 3]-box_b[:, 1]
+    area_b = box_b_h * box_b_w
+    area_b = L.reshape(area_b, (1, B))
+    area_b = L.expand(area_b, [A, 1])  # [A, B]
+
+    union = area_a + area_b - inter
+    iou = inter / union  # [A, B]  iou取值0~1之间，iou越大越应该抑制
+
+    # 长宽比信息
+    atan1 = L.atan(box_a_h / (box_a_w + eps))
+    atan2 = L.atan(box_b_h / (box_b_w + eps))
+    atan1 = L.reshape(atan1, (A, 1))
+    atan1 = L.expand(atan1, [1, B])  # [A, B]
+    atan2 = L.reshape(atan2, (1, B))
+    atan2 = L.expand(atan2, [A, 1])  # [A, B]
+    v = 4.0 * L.pow(atan1 - atan2, 2) / (math.pi ** 2)  # [A, B]  v取值0~1之间，v越小越应该抑制
+
+    factor = 0.4
+    overlap = L.pow(iou, (1 - factor)) * L.pow(1.0 - v, factor)
+
+    return overlap
 
 
 def jaccard(box_a, box_b, type='iou'):
@@ -60,8 +121,8 @@ def jaccard(box_a, box_b, type='iou'):
     """
     if type == 'iou':
         overlap = _iou(box_a, box_b)
-    # elif type == 'giou':
-    #     overlap = _iou(box_a, box_b)
+    elif type == 'iou_hw':
+        overlap = _iou_hw(box_a, box_b)
     return overlap
 
 
