@@ -9,6 +9,7 @@
 # ================================================================
 import paddle
 import paddle.fluid as fluid
+import numpy as np
 import paddle.fluid.layers as L
 import paddle.nn.functional as F
 from paddle.fluid import Variable
@@ -444,6 +445,7 @@ class Conv2dUnit(paddle.nn.Layer):
         self.af = None
         if bn:
             self.bn = paddle.nn.BatchNorm2D(filters, weight_attr=pattr, bias_attr=battr)
+            # self.bn = MyBN(filters, weight_attr=pattr, bias_attr=battr)
         if gn:
             self.gn = paddle.nn.GroupNorm(num_groups=groups, num_channels=filters, weight_attr=pattr, bias_attr=battr)
         if af:
