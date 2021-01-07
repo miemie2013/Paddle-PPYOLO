@@ -96,10 +96,14 @@ def _matrix_nms(bboxes, cate_labels, cate_scores, kernel='gaussian', sigma=2.0):
     # IoU compensation
     # 非同类的iou置为0，同类的iou保留。逐列取最大iou
     compensate_iou = L.reduce_max(iou_matrix * label_matrix, [0, ])   # shape: [n_samples, ]
+    # compensate_iou第0行里的值a0（重复了n_samples次）表示第0个物体与 比它分高 的 同类物体的最高iou为a0，
+    # compensate_iou第1行里的值a1（重复了n_samples次）表示第1个物体与 比它分高 的 同类物体的最高iou为a1，...
+    # compensate_iou里每一列里的值依次代表第0个物体、第1个物体、...、第n_samples-1个物体与 比它自己分高 的 同类物体的最高iou。
     compensate_iou = L.transpose(L.expand(L.reshape(compensate_iou, (1, -1)), [n_samples, 1]), [1, 0])   # shape: [n_samples, n_samples]
 
     # IoU decay
     # 非同类的iou置为0，同类的iou保留。
+    # decay_iou第i行第j列表示的是第i个预测框和第j个预测框的iou，如果不是同类，该iou置0。且只取上三角部分。
     decay_iou = iou_matrix * label_matrix   # shape: [n_samples, n_samples]
 
     # matrix nms
@@ -108,6 +112,12 @@ def _matrix_nms(bboxes, cate_labels, cate_scores, kernel='gaussian', sigma=2.0):
         compensate_matrix = L.exp(-1 * sigma * (compensate_iou ** 2))
         decay_coefficient = L.reduce_sum(decay_matrix / compensate_matrix, [0, ])
     elif kernel == 'linear':
+        # 看第j列。（1_test_matrixnms.py里的例子，看第2列）
+        # decay_iou     里第2列里的值为[0.9389, 0.9979, 0,      0]。第2个物体与比它分高的2个同类物体的iou是0.9389, 0.9979。
+        # compensate_iou里第2列里的值为[0,      0.9409, 0.9979, 0]。比第2个物体分高的2个同类物体 与 比它们自己分高 的 同类物体的最高iou 是0,      0.9409。
+        # decay_matrix  里第2列里的值为[0.0610, 0.0348, 485.28, 1]。取该列的最小值为0.0348（抑制掉第2个物体的是第1个物体）。其实后面2个值不用看，因为它们总是>=1。
+        # 总结：decay_matrix里第j列里的第i个值若为最小值，则抑制掉第j个物体的是第i个物体。
+        # 而且，表现为decay_iou尽可能大，decay_matrix才会尽可能小。
         decay_matrix = (1-decay_iou)/(1-compensate_iou)
         decay_coefficient = L.reduce_min(decay_matrix, [0, ])
     else:
