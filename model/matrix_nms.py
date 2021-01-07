@@ -12,14 +12,13 @@ import paddle.fluid.layers as L
 
 
 
-# 相交矩形的面积
-def intersect(box_a, box_b):
-    """计算两组矩形两两之间相交区域的面积
+def _iou(box_a, box_b):
+    """计算两组矩形两两之间的iou
     Args:
         box_a: (tensor) bounding boxes, Shape: [A, 4].
         box_b: (tensor) bounding boxes, Shape: [B, 4].
     Return:
-      (tensor) intersection area, Shape: [A, B].
+      (tensor) iou, Shape: [A, B].
     """
     A = box_a.shape[0]
     B = box_b.shape[0]
@@ -37,21 +36,7 @@ def intersect(box_a, box_b):
     min_xy = L.elementwise_max(box_a_lu, box_b_lu)
 
     inter = L.relu(max_xy - min_xy)
-    return inter[:, :, 0] * inter[:, :, 1]
-
-
-def jaccard(box_a, box_b):
-    """计算两组矩形两两之间的iou
-    Args:
-        box_a: (tensor) bounding boxes, Shape: [A, 4].
-        box_b: (tensor) bounding boxes, Shape: [B, 4].
-    Return:
-        ious: (tensor) Shape: [A, B]
-    """
-    inter = intersect(box_a, box_b)
-
-    A = box_a.shape[0]
-    B = box_b.shape[0]
+    inter = inter[:, :, 0] * inter[:, :, 1]
 
     area_a = (box_a[:, 2]-box_a[:, 0]) * (box_a[:, 3]-box_a[:, 1])
     area_a = L.reshape(area_a, (A, 1))
@@ -61,9 +46,23 @@ def jaccard(box_a, box_b):
     area_b = L.reshape(area_b, (1, B))
     area_b = L.expand(area_b, [A, 1])  # [A, B]
 
-
     union = area_a + area_b - inter
     return inter / union  # [A, B]
+
+
+def jaccard(box_a, box_b, type='iou'):
+    """计算两组矩形两两之间的重叠
+    Args:
+        box_a: (tensor) bounding boxes, Shape: [A, 4].
+        box_b: (tensor) bounding boxes, Shape: [B, 4].
+    Return:
+        overlap: (tensor) Shape: [A, B]
+    """
+    if type == 'iou':
+        overlap = _iou(box_a, box_b)
+    # elif type == 'giou':
+    #     overlap = _iou(box_a, box_b)
+    return overlap
 
 
 
