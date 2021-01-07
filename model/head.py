@@ -16,7 +16,7 @@ import copy
 import math
 
 from model.custom_layers import *
-
+from model.matrix_nms import matrix_nms
 
 
 def _split_ioup(output, an_num, num_classes):
@@ -389,7 +389,8 @@ class YOLOv3Head(paddle.nn.Layer):
         batch_size = yolo_boxes.shape[0]
         if nms_type == 'matrix_nms':
             for i in range(batch_size):
-                pred = fluid.layers.matrix_nms(yolo_boxes[i:i+1, :, :], yolo_scores[i:i+1, :, :], background_label=-1, **nms_cfg)
+                # pred = fluid.layers.matrix_nms(yolo_boxes[i:i+1, :, :], yolo_scores[i:i+1, :, :], background_label=-1, **nms_cfg)
+                pred = matrix_nms(yolo_boxes[i, :, :], yolo_scores[i, :, :], **nms_cfg)
                 preds.append(pred)
         elif nms_type == 'multiclass_nms':
             for i in range(batch_size):
