@@ -354,9 +354,7 @@ class Conv2dUnit(paddle.nn.Layer):
                  filter_size,
                  stride=1,
                  bias_attr=False,
-                 bn=0,
-                 gn=0,
-                 af=0,
+                 norm_type=None,
                  groups=32,
                  act=None,
                  freeze_norm=False,
@@ -417,6 +415,8 @@ class Conv2dUnit(paddle.nn.Layer):
 
 
         # norm
+        assert norm_type in [None, 'bn', 'sync_bn', 'gn', 'affine_channel']
+        bn, gn, af = get_norm(norm_type)
         if conv_name == "conv1":
             norm_name = "bn_" + conv_name
             if gn:

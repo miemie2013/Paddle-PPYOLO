@@ -12,6 +12,7 @@ from model.my_loss import *
 from model.iou_losses import *
 from model.head import *
 from model.yolov4_head import *
+from model.resnet_vb import *
 from model.resnet_vd import *
 from model.cspdarknet import *
 from model.mobilenet_v3 import *
@@ -20,6 +21,8 @@ from model.mobilenet_v3 import *
 def select_backbone(name):
     if name == 'Resnet50Vd':
         return Resnet50Vd
+    if name == 'Resnet50Vb':
+        return Resnet50Vb
     if name == 'Resnet18Vd':
         return Resnet18Vd
     if name == 'MobileNetV3':

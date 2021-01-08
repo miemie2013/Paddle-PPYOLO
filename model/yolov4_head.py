@@ -77,69 +77,66 @@ class YOLOv4Head(paddle.nn.Layer):
                 temp += anchors[aid]
             self.mask_anchors.append(temp)
 
-        assert norm_type in ['bn', 'sync_bn', 'gn', 'affine_channel']
-        bn, gn, af = get_norm(norm_type)
-
         num_anchors = len(anchor_masks[0])
         self.num_anchors = num_anchors
 
-        self.conv073 = Conv2dUnit(1024, 512, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv073')
-        self.conv074 = Conv2dUnit(512, 1024, 3, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv074')
-        self.conv075 = Conv2dUnit(1024, 512, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv075')
+        self.conv073 = Conv2dUnit(1024, 512, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv073')
+        self.conv074 = Conv2dUnit(512, 1024, 3, stride=1, norm_type=norm_type, act='leaky', name='head.conv074')
+        self.conv075 = Conv2dUnit(1024, 512, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv075')
         self.spp = SPP(seq='desc')
-        self.conv076 = Conv2dUnit(512 * 4, 512, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv076')
-        self.conv077 = Conv2dUnit(512, 1024, 3, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv077')
-        self.conv078 = Conv2dUnit(1024, 512, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv078')
+        self.conv076 = Conv2dUnit(512 * 4, 512, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv076')
+        self.conv077 = Conv2dUnit(512, 1024, 3, stride=1, norm_type=norm_type, act='leaky', name='head.conv077')
+        self.conv078 = Conv2dUnit(1024, 512, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv078')
 
         # pan01
-        self.conv079 = Conv2dUnit(512, 256, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv079')
+        self.conv079 = Conv2dUnit(512, 256, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv079')
         self.upsample1 = paddle.nn.Upsample(scale_factor=2.0, mode='nearest')
-        self.conv080 = Conv2dUnit(512, 256, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv080')
-        self.conv081 = Conv2dUnit(512, 256, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv081')
-        self.conv082 = Conv2dUnit(256, 512, 3, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv082')
-        self.conv083 = Conv2dUnit(512, 256, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv083')
-        self.conv084 = Conv2dUnit(256, 512, 3, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv084')
-        self.conv085 = Conv2dUnit(512, 256, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv085')
+        self.conv080 = Conv2dUnit(512, 256, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv080')
+        self.conv081 = Conv2dUnit(512, 256, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv081')
+        self.conv082 = Conv2dUnit(256, 512, 3, stride=1, norm_type=norm_type, act='leaky', name='head.conv082')
+        self.conv083 = Conv2dUnit(512, 256, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv083')
+        self.conv084 = Conv2dUnit(256, 512, 3, stride=1, norm_type=norm_type, act='leaky', name='head.conv084')
+        self.conv085 = Conv2dUnit(512, 256, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv085')
         # pan01结束
 
         # pan02
-        self.conv086 = Conv2dUnit(256, 128, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv086')
+        self.conv086 = Conv2dUnit(256, 128, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv086')
         self.upsample2 = paddle.nn.Upsample(scale_factor=2.0, mode='nearest')
-        self.conv087 = Conv2dUnit(256, 128, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv087')
-        self.conv088 = Conv2dUnit(256, 128, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv088')
-        self.conv089 = Conv2dUnit(128, 256, 3, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv089')
-        self.conv090 = Conv2dUnit(256, 128, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv090')
-        self.conv091 = Conv2dUnit(128, 256, 3, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv091')
-        self.conv092 = Conv2dUnit(256, 128, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv092')
+        self.conv087 = Conv2dUnit(256, 128, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv087')
+        self.conv088 = Conv2dUnit(256, 128, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv088')
+        self.conv089 = Conv2dUnit(128, 256, 3, stride=1, norm_type=norm_type, act='leaky', name='head.conv089')
+        self.conv090 = Conv2dUnit(256, 128, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv090')
+        self.conv091 = Conv2dUnit(128, 256, 3, stride=1, norm_type=norm_type, act='leaky', name='head.conv091')
+        self.conv092 = Conv2dUnit(256, 128, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv092')
         # pan02结束
 
         # output_s, 不用concat()
-        self.conv093 = Conv2dUnit(128, 256, 3, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv093')
+        self.conv093 = Conv2dUnit(128, 256, 3, stride=1, norm_type=norm_type, act='leaky', name='head.conv093')
         self.conv094 = Conv2dUnit(256, num_anchors * (num_classes + 5), 1, stride=1, bias_attr=True, act=None, name='head.conv094')
 
 
         # output_m, 需要concat()
-        self.conv095 = Conv2dUnit(128, 256, 3, stride=2, bn=bn, gn=gn, af=af, act='leaky', name='head.conv095')
+        self.conv095 = Conv2dUnit(128, 256, 3, stride=2, norm_type=norm_type, act='leaky', name='head.conv095')
 
-        self.conv096 = Conv2dUnit(512, 256, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv096')
-        self.conv097 = Conv2dUnit(256, 512, 3, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv097')
-        self.conv098 = Conv2dUnit(512, 256, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv098')
-        self.conv099 = Conv2dUnit(256, 512, 3, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv099')
-        self.conv100 = Conv2dUnit(512, 256, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv100')
+        self.conv096 = Conv2dUnit(512, 256, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv096')
+        self.conv097 = Conv2dUnit(256, 512, 3, stride=1, norm_type=norm_type, act='leaky', name='head.conv097')
+        self.conv098 = Conv2dUnit(512, 256, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv098')
+        self.conv099 = Conv2dUnit(256, 512, 3, stride=1, norm_type=norm_type, act='leaky', name='head.conv099')
+        self.conv100 = Conv2dUnit(512, 256, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv100')
 
-        self.conv101 = Conv2dUnit(256, 512, 3, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv101')
+        self.conv101 = Conv2dUnit(256, 512, 3, stride=1, norm_type=norm_type, act='leaky', name='head.conv101')
         self.conv102 = Conv2dUnit(512, num_anchors * (num_classes + 5), 1, stride=1, bias_attr=True, act=None, name='head.conv102')
 
         # output_l, 需要concat()
-        self.conv103 = Conv2dUnit(256, 512, 3, stride=2, bn=bn, gn=gn, af=af, act='leaky', name='head.conv103')
+        self.conv103 = Conv2dUnit(256, 512, 3, stride=2, norm_type=norm_type, act='leaky', name='head.conv103')
 
-        self.conv104 = Conv2dUnit(1024, 512, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv104')
-        self.conv105 = Conv2dUnit(512, 1024, 3, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv105')
-        self.conv106 = Conv2dUnit(1024, 512, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv106')
-        self.conv107 = Conv2dUnit(512, 1024, 3, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv107')
-        self.conv108 = Conv2dUnit(1024, 512, 1, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv108')
+        self.conv104 = Conv2dUnit(1024, 512, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv104')
+        self.conv105 = Conv2dUnit(512, 1024, 3, stride=1, norm_type=norm_type, act='leaky', name='head.conv105')
+        self.conv106 = Conv2dUnit(1024, 512, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv106')
+        self.conv107 = Conv2dUnit(512, 1024, 3, stride=1, norm_type=norm_type, act='leaky', name='head.conv107')
+        self.conv108 = Conv2dUnit(1024, 512, 1, stride=1, norm_type=norm_type, act='leaky', name='head.conv108')
 
-        self.conv109 = Conv2dUnit(512, 1024, 3, stride=1, bn=bn, gn=gn, af=af, act='leaky', name='head.conv109')
+        self.conv109 = Conv2dUnit(512, 1024, 3, stride=1, norm_type=norm_type, act='leaky', name='head.conv109')
         self.conv110 = Conv2dUnit(1024, num_anchors * (num_classes + 5), 1, stride=1, bias_attr=True, act=None, name='head.conv110')
 
     def get_conv2dunit(self, name):
