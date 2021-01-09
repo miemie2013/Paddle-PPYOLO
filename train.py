@@ -72,7 +72,7 @@ def read_train_data(cfg,
                     train_dic,
                     use_gpu,
                     n_layers,
-                    context, with_mixup, with_cutmix, mixup_steps, cutmix_steps, sample_transforms, batch_transforms):
+                    context, with_mixup, with_cutmix, with_mosaic, mixup_steps, cutmix_steps, mosaic_steps, sample_transforms, batch_transforms):
     iter_id = _iter_id
     num_threads = cfg.train_cfg['num_threads']
     while True:   # 无限个epoch
@@ -100,7 +100,7 @@ def read_train_data(cfg,
             target2 = [None] * batch_size
 
             samples = get_samples(train_records, train_indexes, step, batch_size, iter_id,
-                                  with_mixup, with_cutmix, mixup_steps, cutmix_steps)
+                                  with_mixup, with_cutmix, with_mosaic, mixup_steps, cutmix_steps, mosaic_steps)
             # sample_transforms用多线程
             threads = []
             for i in range(num_threads):
@@ -323,8 +323,10 @@ if __name__ == '__main__':
     batch_size = cfg.train_cfg['batch_size']
     with_mixup = cfg.decodeImage['with_mixup']
     with_cutmix = cfg.decodeImage['with_cutmix']
+    with_mosaic = cfg.decodeImage['with_mosaic']
     mixup_epoch = cfg.train_cfg['mixup_epoch']
     cutmix_epoch = cfg.train_cfg['cutmix_epoch']
+    mosaic_epoch = cfg.train_cfg['mosaic_epoch']
     context = cfg.context
     # 预处理
     # sample_transforms
@@ -334,6 +336,10 @@ if __name__ == '__main__':
             preprocess = DecodeImage(**cfg.decodeImage)   # 对图片解码。最开始的一步。
         elif preprocess_name == 'mixupImage':
             preprocess = MixupImage(**cfg.mixupImage)      # mixup增强
+        elif preprocess_name == 'cutmixImage':
+            preprocess = CutmixImage(**cfg.cutmixImage)    # cutmix增强
+        elif preprocess_name == 'mosaicImage':
+            preprocess = MosaicImage(**cfg.mosaicImage)    # mosaic增强
         elif preprocess_name == 'colorDistort':
             preprocess = ColorDistort(**cfg.colorDistort)  # 颜色扰动
         elif preprocess_name == 'randomExpand':
@@ -383,6 +389,7 @@ if __name__ == '__main__':
     train_steps = num_train // batch_size
     mixup_steps = mixup_epoch * train_steps
     cutmix_steps = cutmix_epoch * train_steps
+    mosaic_steps = mosaic_epoch * train_steps
     print('\n=============== mixup and cutmix ===============')
     print('steps_per_epoch: %d' % train_steps)
     if with_mixup:
@@ -393,6 +400,10 @@ if __name__ == '__main__':
         print('cutmix_steps: %d' % cutmix_steps)
     else:
         print('don\'t use cutmix.')
+    if with_mosaic:
+        print('mosaic_steps: %d' % mosaic_steps)
+    else:
+        print('don\'t use mosaic.')
 
     # 读数据的线程
     train_dic ={}
@@ -406,7 +417,7 @@ if __name__ == '__main__':
                                  train_dic,
                                  use_gpu,
                                  n_layers,
-                                 context, with_mixup, with_cutmix, mixup_steps, cutmix_steps, sample_transforms, batch_transforms))
+                                 context, with_mixup, with_cutmix, with_mosaic, mixup_steps, cutmix_steps, mosaic_steps, sample_transforms, batch_transforms))
     thr.start()
 
 

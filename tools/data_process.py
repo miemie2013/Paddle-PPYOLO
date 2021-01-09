@@ -86,7 +86,7 @@ def data_clean(coco, img_ids, catid2clsid, image_dir):
     return records
 
 def get_samples(train_records, train_indexes, step, batch_size, iter_id,
-                with_mixup, with_cutmix, mixup_steps, cutmix_steps):
+                with_mixup, with_cutmix, with_mosaic, mixup_steps, cutmix_steps, mosaic_steps):
     indexes = train_indexes[step * batch_size:(step + 1) * batch_size]
     samples = []
     for i in range(batch_size):
@@ -108,6 +108,19 @@ def get_samples(train_records, train_indexes, step, batch_size, iter_id,
             mix_idx = np.random.randint(1, num)
             sample['cutmix'] = copy.deepcopy(train_records[mix_idx])
             sample['cutmix']["curr_iter"] = iter_id
+
+        # 为mosaic数据增强做准备
+        if with_mosaic and iter_id <= mosaic_steps:
+            num = len(train_indexes)
+            mix_idx = np.random.randint(1, num)
+            sample['mosaic1'] = copy.deepcopy(train_records[mix_idx])
+            sample['mosaic1']["curr_iter"] = iter_id
+            mix_idx = np.random.randint(1, num)
+            sample['mosaic2'] = copy.deepcopy(train_records[mix_idx])
+            sample['mosaic2']["curr_iter"] = iter_id
+            mix_idx = np.random.randint(1, num)
+            sample['mosaic3'] = copy.deepcopy(train_records[mix_idx])
+            sample['mosaic3']["curr_iter"] = iter_id
 
         samples.append(sample)
     return samples

@@ -59,18 +59,20 @@ class BaseOperator(object):
 
 
 class DecodeImage(BaseOperator):
-    def __init__(self, to_rgb=True, with_mixup=False, with_cutmix=False):
+    def __init__(self, to_rgb=True, with_mixup=False, with_cutmix=False, with_mosaic=False):
         """ Transform the image data to numpy format.
         Args:
             to_rgb (bool): whether to convert BGR to RGB
             with_mixup (bool): whether or not to mixup image and gt_bbbox/gt_score
             with_cutmix (bool): whether or not to cutmix image and gt_bbbox/gt_score
+            with_mosaic (bool): whether or not to mosaic image and gt_bbbox/gt_score
         """
 
         super(DecodeImage, self).__init__()
         self.to_rgb = to_rgb
         self.with_mixup = with_mixup
         self.with_cutmix = with_cutmix
+        self.with_mosaic = with_mosaic
         if not isinstance(self.to_rgb, bool):
             raise TypeError("{}: input type is invalid.".format(self))
         if not isinstance(self.with_mixup, bool):
@@ -119,6 +121,12 @@ class DecodeImage(BaseOperator):
         if self.with_cutmix and 'cutmix' in sample:
             self.__call__(sample['cutmix'], context)
 
+        # decode mosaic image
+        if self.with_mosaic and 'mosaic1' in sample:
+            self.__call__(sample['mosaic1'], context)
+            self.__call__(sample['mosaic2'], context)
+            self.__call__(sample['mosaic3'], context)
+
         # decode semantic label
         if 'semantic' in sample.keys() and sample['semantic'] is not None:
             sem_file = sample['semantic']
@@ -164,8 +172,8 @@ class MixupImage(BaseOperator):
         if factor <= 0.0:
             return sample['mixup']
         im = self._mixup_img(sample['image'], sample['mixup']['image'], factor)
-        gt_bbox1 = sample['gt_bbox']
-        gt_bbox2 = sample['mixup']['gt_bbox']
+        gt_bbox1 = sample['gt_bbox'].reshape((-1, 4))
+        gt_bbox2 = sample['mixup']['gt_bbox'].reshape((-1, 4))
         gt_bbox = np.concatenate((gt_bbox1, gt_bbox2), axis=0)
         gt_class1 = sample['gt_class']
         gt_class2 = sample['mixup']['gt_class']
@@ -188,6 +196,311 @@ class MixupImage(BaseOperator):
         sample['h'] = im.shape[0]
         sample['w'] = im.shape[1]
         sample.pop('mixup')
+        return sample
+
+
+class CutmixImage(BaseOperator):
+    def __init__(self, alpha=1.5, beta=1.5):
+        """
+        CutMix: Regularization Strategy to Train Strong Classifiers with Localizable Features, see https://https://arxiv.org/abs/1905.04899
+        Cutmix image and gt_bbbox/gt_score
+        Args:
+             alpha (float): alpha parameter of beta distribute
+             beta (float): beta parameter of beta distribute
+        """
+        super(CutmixImage, self).__init__()
+        self.alpha = alpha
+        self.beta = beta
+        if self.alpha <= 0.0:
+            raise ValueError("alpha shold be positive in {}".format(self))
+        if self.beta <= 0.0:
+            raise ValueError("beta shold be positive in {}".format(self))
+
+    def _rand_bbox(self, img1, img2, factor):
+        """ _rand_bbox """
+        h = max(img1.shape[0], img2.shape[0])
+        w = max(img1.shape[1], img2.shape[1])
+        cut_rat = np.sqrt(1. - factor)
+
+        cut_w = np.int(w * cut_rat)
+        cut_h = np.int(h * cut_rat)
+
+        # uniform
+        cx = np.random.randint(w)
+        cy = np.random.randint(h)
+
+        bbx1 = np.clip(cx - cut_w // 2, 0, w)
+        bby1 = np.clip(cy - cut_h // 2, 0, h)
+        bbx2 = np.clip(cx + cut_w // 2, 0, w)
+        bby2 = np.clip(cy + cut_h // 2, 0, h)
+
+        img_1 = np.zeros((h, w, img1.shape[2]), 'float32')
+        img_1[:img1.shape[0], :img1.shape[1], :] = \
+            img1.astype('float32')
+        img_2 = np.zeros((h, w, img2.shape[2]), 'float32')
+        img_2[:img2.shape[0], :img2.shape[1], :] = \
+            img2.astype('float32')
+        img_1[bby1:bby2, bbx1:bbx2, :] = img2[bby1:bby2, bbx1:bbx2, :]
+        return img_1
+
+    def __call__(self, sample, context=None):
+        if 'cutmix' not in sample:
+            return sample
+        factor = np.random.beta(self.alpha, self.beta)
+        factor = max(0.0, min(1.0, factor))
+        if factor >= 1.0:
+            sample.pop('cutmix')
+            return sample
+        if factor <= 0.0:
+            return sample['cutmix']
+        img1 = sample['image']
+        img2 = sample['cutmix']['image']
+        img = self._rand_bbox(img1, img2, factor)
+        gt_bbox1 = sample['gt_bbox'].reshape((-1, 4))
+        gt_bbox2 = sample['cutmix']['gt_bbox'].reshape((-1, 4))
+        gt_bbox = np.concatenate((gt_bbox1, gt_bbox2), axis=0)
+        gt_class1 = sample['gt_class']
+        gt_class2 = sample['cutmix']['gt_class']
+        gt_class = np.concatenate((gt_class1, gt_class2), axis=0)
+        gt_score1 = sample['gt_score']
+        gt_score2 = sample['cutmix']['gt_score']
+        gt_score = np.concatenate(
+            (gt_score1 * factor, gt_score2 * (1. - factor)), axis=0)
+        sample['image'] = img
+        sample['gt_bbox'] = gt_bbox
+        sample['gt_score'] = gt_score
+        sample['gt_class'] = gt_class
+        sample['h'] = img.shape[0]
+        sample['w'] = img.shape[1]
+        sample.pop('cutmix')
+        return sample
+
+class MosaicImage(BaseOperator):
+    def __init__(self, alpha=1.5, beta=1.5, thr=0.3):
+        """
+        CutMix: Regularization Strategy to Train Strong Classifiers with Localizable Features, see https://https://arxiv.org/abs/1905.04899
+        Cutmix image and gt_bbbox/gt_score
+        Args:
+             alpha (float): alpha parameter of beta distribute
+             beta (float): beta parameter of beta distribute
+        """
+        super(MosaicImage, self).__init__()
+        self.alpha = alpha
+        self.beta = beta
+        self.thr = thr
+        if self.alpha <= 0.0:
+            raise ValueError("alpha shold be positive in {}".format(self))
+        if self.beta <= 0.0:
+            raise ValueError("beta shold be positive in {}".format(self))
+
+    def _rand_bbox(self, img1, img2, img3, img4, factor_y, factor_x):
+        """ _rand_bbox """
+        h = max(img1.shape[0], img2.shape[0], img3.shape[0], img4.shape[0])
+        w = max(img1.shape[1], img2.shape[1], img3.shape[1], img4.shape[1])
+        scale = np.random.uniform(0, 1) * 0.5 + 1.0  # 取值范围[1.0, 1.5]
+        h = int(h * scale)
+        w = int(w * scale)
+
+        cx = np.int(w * factor_x)
+        cy = np.int(h * factor_y)
+        return h, w, cx, cy
+
+    def overlap(self, box1_x0, box1_y0, box1_x1, box1_y1, box2_x0, box2_y0, box2_x1, box2_y1):
+        # 两个矩形的面积
+        # box1_area = (box1_x1 - box1_x0) * (box1_y1 - box1_y0)
+        box2_area = (box2_x1 - box2_x0) * (box2_y1 - box2_y0)
+
+        # 相交矩形的左下角坐标、右上角坐标
+        cx0 = max(box1_x0, box2_x0)
+        cy0 = max(box1_y0, box2_y0)
+        cx1 = min(box1_x1, box2_x1)
+        cy1 = min(box1_y1, box2_y1)
+
+        # 相交矩形的面积inter_area。
+        inter_w = max(cx1 - cx0, 0.0)
+        inter_h = max(cy1 - cy0, 0.0)
+        inter_area = inter_w * inter_h
+        _overlap = inter_area / (box2_area + 1e-9)
+        return _overlap
+
+    def __call__(self, sample, context=None):
+        img1 = sample['image']
+        img2 = sample['mosaic1']['image']
+        img3 = sample['mosaic2']['image']
+        img4 = sample['mosaic3']['image']
+        factor_y = np.random.uniform(0, 1) * 0.5 + 0.25   # 取值范围[0.25, 0.75]
+        factor_x = np.random.uniform(0, 1) * 0.5 + 0.25   # 取值范围[0.25, 0.75]
+        # cv2.imwrite('aaaaaa1.jpg', cv2.cvtColor(img1, cv2.COLOR_RGB2BGR))
+        # cv2.imwrite('aaaaaa2.jpg', cv2.cvtColor(img2, cv2.COLOR_RGB2BGR))
+        # cv2.imwrite('aaaaaa3.jpg', cv2.cvtColor(img3, cv2.COLOR_RGB2BGR))
+        # cv2.imwrite('aaaaaa4.jpg', cv2.cvtColor(img4, cv2.COLOR_RGB2BGR))
+        h, w, cx, cy = self._rand_bbox(img1, img2, img3, img4, factor_y, factor_x)
+        img = np.zeros((h, w, img1.shape[2]), 'float32')
+
+
+        img1_box_xyxy =   [0, 0, min(img1.shape[1], cx), min(img1.shape[0], cy)]
+        img1_inner_xyxy = [0, 0, min(img1.shape[1], cx), min(img1.shape[0], cy)]
+
+        img2_box_xyxy =   [max(w - img2.shape[1], cx),                               0,            w,              min(img2.shape[0], cy)]
+        img2_inner_xyxy = [img2.shape[1] - (img2_box_xyxy[2] - img2_box_xyxy[0]),     0,          img2.shape[1],  min(img2.shape[0], cy)]
+
+        img3_box_xyxy =   [0,       max(h - img3.shape[0], cy),              min(img3.shape[1], cx),       h]
+        img3_inner_xyxy = [0,    img3.shape[0] - (img3_box_xyxy[3] - img3_box_xyxy[1]),  min(img3.shape[1], cx),       img3.shape[0]]
+
+        img4_box_xyxy =   [max(w - img4.shape[1], cx), max(h - img4.shape[0], cy), w, h]
+        img4_inner_xyxy = [img4.shape[1] - (img4_box_xyxy[2] - img4_box_xyxy[0]), img4.shape[0] - (img4_box_xyxy[3] - img4_box_xyxy[1]), img4.shape[1], img4.shape[0]]
+
+
+        img[img1_box_xyxy[1]:img1_box_xyxy[3], img1_box_xyxy[0]:img1_box_xyxy[2], :] = \
+            img1.astype('float32')[img1_inner_xyxy[1]:img1_inner_xyxy[3], img1_inner_xyxy[0]:img1_inner_xyxy[2], :]
+        img[img2_box_xyxy[1]:img2_box_xyxy[3], img2_box_xyxy[0]:img2_box_xyxy[2], :] = \
+            img2.astype('float32')[img2_inner_xyxy[1]:img2_inner_xyxy[3], img2_inner_xyxy[0]:img2_inner_xyxy[2], :]
+        img[img3_box_xyxy[1]:img3_box_xyxy[3], img3_box_xyxy[0]:img3_box_xyxy[2], :] = \
+            img3.astype('float32')[img3_inner_xyxy[1]:img3_inner_xyxy[3], img3_inner_xyxy[0]:img3_inner_xyxy[2], :]
+        img[img4_box_xyxy[1]:img4_box_xyxy[3], img4_box_xyxy[0]:img4_box_xyxy[2], :] = \
+            img4.astype('float32')[img4_inner_xyxy[1]:img4_inner_xyxy[3], img4_inner_xyxy[0]:img4_inner_xyxy[2], :]
+
+
+        # cv2.imwrite('aaaaaa5.jpg', cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+        gt_bbox1 = sample['gt_bbox'].reshape((-1, 4))
+        gt_bbox2 = sample['mosaic1']['gt_bbox'].reshape((-1, 4))
+        gt_bbox3 = sample['mosaic2']['gt_bbox'].reshape((-1, 4))
+        gt_bbox4 = sample['mosaic3']['gt_bbox'].reshape((-1, 4))
+        gt_class1 = sample['gt_class'].reshape((-1, ))
+        gt_class2 = sample['mosaic1']['gt_class'].reshape((-1, ))
+        gt_class3 = sample['mosaic2']['gt_class'].reshape((-1, ))
+        gt_class4 = sample['mosaic3']['gt_class'].reshape((-1, ))
+        gt_score1 = sample['gt_score'].reshape((-1, ))
+        gt_score2 = sample['mosaic1']['gt_score'].reshape((-1, ))
+        gt_score3 = sample['mosaic2']['gt_score'].reshape((-1, ))
+        gt_score4 = sample['mosaic3']['gt_score'].reshape((-1, ))
+        gt_is_crowd1 = sample['is_crowd'].reshape((-1, ))
+        gt_is_crowd2 = sample['mosaic1']['is_crowd'].reshape((-1, ))
+        gt_is_crowd3 = sample['mosaic2']['is_crowd'].reshape((-1, ))
+        gt_is_crowd4 = sample['mosaic3']['is_crowd'].reshape((-1, ))
+        # gt_bbox4222222 = np.copy(gt_bbox4)
+        # gt_score4222222 = np.copy(gt_score4)
+        # gt_class4222222 = np.copy(gt_class4)
+
+        # img1
+        for i, box in enumerate(gt_bbox1):
+            ov = self.overlap(img1_box_xyxy[0], img1_box_xyxy[1], img1_box_xyxy[2], img1_box_xyxy[3],
+                              box[0], box[1], box[2], box[3])
+            if ov < self.thr:
+                gt_score1[i] -= 99.0
+            else:
+                x0 = np.clip(box[0], img1_box_xyxy[0], img1_box_xyxy[2])
+                y0 = np.clip(box[1], img1_box_xyxy[1], img1_box_xyxy[3])
+                x1 = np.clip(box[2], img1_box_xyxy[0], img1_box_xyxy[2])
+                y1 = np.clip(box[3], img1_box_xyxy[1], img1_box_xyxy[3])
+                gt_bbox1[i, :] = np.array([x0, y0, x1, y1])
+        keep = np.where(gt_score1 >= 0.0)
+        gt_bbox1 = gt_bbox1[keep]     # [M, 4]
+        gt_score1 = gt_score1[keep]   # [M, ]
+        gt_class1 = gt_class1[keep]   # [M, ]
+        gt_is_crowd1 = gt_is_crowd1[keep]   # [M, ]
+
+        # img2
+        for i, box in enumerate(gt_bbox2):
+            offset_x = img2_box_xyxy[0]
+            if img2.shape[1] >= w - cx:
+                offset_x = w - img2.shape[1]
+            box[0] += offset_x
+            box[1] += 0
+            box[2] += offset_x
+            box[3] += 0
+            ov = self.overlap(img2_box_xyxy[0], img2_box_xyxy[1], img2_box_xyxy[2], img2_box_xyxy[3],
+                              box[0], box[1], box[2], box[3])
+            if ov < self.thr:
+                gt_score2[i] -= 99.0
+            else:
+                x0 = np.clip(box[0], img2_box_xyxy[0], img2_box_xyxy[2])
+                y0 = np.clip(box[1], img2_box_xyxy[1], img2_box_xyxy[3])
+                x1 = np.clip(box[2], img2_box_xyxy[0], img2_box_xyxy[2])
+                y1 = np.clip(box[3], img2_box_xyxy[1], img2_box_xyxy[3])
+                gt_bbox2[i, :] = np.array([x0, y0, x1, y1])
+        keep = np.where(gt_score2 >= 0.0)
+        gt_bbox2 = gt_bbox2[keep]     # [M, 4]
+        gt_score2 = gt_score2[keep]   # [M, ]
+        gt_class2 = gt_class2[keep]   # [M, ]
+        gt_is_crowd2 = gt_is_crowd2[keep]   # [M, ]
+
+        # img3
+        for i, box in enumerate(gt_bbox3):
+            offset_y = img3_box_xyxy[1]
+            if img3.shape[0] >= h - cy:
+                offset_y = h - img3.shape[0]
+            box[0] += 0
+            box[1] += offset_y
+            box[2] += 0
+            box[3] += offset_y
+            ov = self.overlap(img3_box_xyxy[0], img3_box_xyxy[1], img3_box_xyxy[2], img3_box_xyxy[3],
+                              box[0], box[1], box[2], box[3])
+            if ov < self.thr:
+                gt_score3[i] -= 99.0
+            else:
+                x0 = np.clip(box[0], img3_box_xyxy[0], img3_box_xyxy[2])
+                y0 = np.clip(box[1], img3_box_xyxy[1], img3_box_xyxy[3])
+                x1 = np.clip(box[2], img3_box_xyxy[0], img3_box_xyxy[2])
+                y1 = np.clip(box[3], img3_box_xyxy[1], img3_box_xyxy[3])
+                gt_bbox3[i, :] = np.array([x0, y0, x1, y1])
+        keep = np.where(gt_score3 >= 0.0)
+        gt_bbox3 = gt_bbox3[keep]     # [M, 4]
+        gt_score3 = gt_score3[keep]   # [M, ]
+        gt_class3 = gt_class3[keep]   # [M, ]
+        gt_is_crowd3 = gt_is_crowd3[keep]   # [M, ]
+
+        # img4
+        for i, box in enumerate(gt_bbox4):
+            offset_x = img4_box_xyxy[0]
+            if img4.shape[1] >= w - cx:
+                offset_x = w - img4.shape[1]
+            offset_y = img4_box_xyxy[1]
+            if img4.shape[0] >= h - cy:
+                offset_y = h - img4.shape[0]
+            box[0] += offset_x
+            box[1] += offset_y
+            box[2] += offset_x
+            box[3] += offset_y
+            ov = self.overlap(img4_box_xyxy[0], img4_box_xyxy[1], img4_box_xyxy[2], img4_box_xyxy[3],
+                              box[0], box[1], box[2], box[3])
+            if ov < self.thr:
+                gt_score4[i] -= 99.0
+            else:
+                x0 = np.clip(box[0], img4_box_xyxy[0], img4_box_xyxy[2])
+                y0 = np.clip(box[1], img4_box_xyxy[1], img4_box_xyxy[3])
+                x1 = np.clip(box[2], img4_box_xyxy[0], img4_box_xyxy[2])
+                y1 = np.clip(box[3], img4_box_xyxy[1], img4_box_xyxy[3])
+                gt_bbox4[i, :] = np.array([x0, y0, x1, y1])
+        keep = np.where(gt_score4 >= 0.0)
+        gt_bbox4 = gt_bbox4[keep]     # [M, 4]
+        gt_score4 = gt_score4[keep]   # [M, ]
+        gt_class4 = gt_class4[keep]   # [M, ]
+        gt_is_crowd4 = gt_is_crowd4[keep]   # [M, ]
+
+        # gt_bbox4222222 = gt_bbox4222222[keep]     # [M, 4]
+        # gt_score4222222 = gt_score4222222[keep]   # [M, ]
+        # gt_class4222222 = gt_class4222222[keep]   # [M, ]
+
+
+        gt_bbox = np.concatenate((gt_bbox1, gt_bbox2, gt_bbox3, gt_bbox4), axis=0)
+        gt_class = np.concatenate((gt_class1, gt_class2, gt_class3, gt_class4), axis=0)
+        gt_is_crowd = np.concatenate((gt_is_crowd1, gt_is_crowd2, gt_is_crowd3, gt_is_crowd4), axis=0)
+        gt_score = np.concatenate((gt_score1, gt_score2, gt_score3, gt_score4), axis=0)
+        # gt_score = np.concatenate((gt_score1 * factor, gt_score2 * (1. - factor)), axis=0)
+        gt_class = np.reshape(gt_class, (-1, 1))
+        gt_score = np.reshape(gt_score, (-1, 1))
+        gt_is_crowd = np.reshape(gt_is_crowd, (-1, 1))
+        sample['image'] = img
+        sample['gt_bbox'] = gt_bbox
+        sample['gt_score'] = gt_score
+        sample['gt_class'] = gt_class
+        sample['is_crowd'] = gt_is_crowd
+        sample['h'] = img.shape[0]
+        sample['w'] = img.shape[1]
+        sample.pop('mosaic1')
+        sample.pop('mosaic2')
+        sample.pop('mosaic3')
         return sample
 
 
