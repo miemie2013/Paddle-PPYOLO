@@ -103,6 +103,7 @@ class PPYOLO_r18vd_Config(object):
         self.use_ema = True
         # self.use_ema = False
         self.ema_decay = 0.9998
+        self.ema_iter = 20
         self.backbone_type = 'Resnet18Vd'
         self.backbone = dict(
             norm_type='bn',

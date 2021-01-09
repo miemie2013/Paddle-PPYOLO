@@ -103,6 +103,7 @@ class YOLOv4_2x_Config(object):
         self.use_ema = True
         # self.use_ema = False
         self.ema_decay = 0.9998
+        self.ema_iter = 20
         self.backbone_type = 'CSPDarknet53'
         self.backbone = dict(
             norm_type='bn',

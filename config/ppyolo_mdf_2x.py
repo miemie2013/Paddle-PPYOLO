@@ -104,6 +104,7 @@ class PPYOLO_mdf_2x_Config(object):
         self.use_ema = True
         # self.use_ema = False
         self.ema_decay = 0.9998
+        self.ema_iter = 20
         self.backbone_type = 'Resnet50Vd'
         self.backbone = dict(
             norm_type='bn',

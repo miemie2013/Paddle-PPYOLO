@@ -103,6 +103,7 @@ class PPYOLO_mobilenet_v3_large_Config(object):
         self.use_ema = True
         # self.use_ema = False
         self.ema_decay = 0.9998
+        self.ema_iter = 20
         self.backbone_type = 'MobileNetV3'
         self.backbone = dict(
             norm_type='sync_bn',
