@@ -170,9 +170,9 @@ class PPYOLO_2x_Config(object):
         # DecodeImage
         self.decodeImage = dict(
             to_rgb=True,
-            with_mixup=False,
+            with_mixup=True,
             with_cutmix=False,
-            with_mosaic=True,
+            with_mosaic=False,
         )
         # MixupImage
         self.mixupImage = dict(

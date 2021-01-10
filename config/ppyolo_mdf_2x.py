@@ -251,8 +251,8 @@ class PPYOLO_mdf_2x_Config(object):
         elif self.decodeImage['with_mosaic']:
             self.sample_transforms_seq.append('mosaicImage')
         self.sample_transforms_seq.append('colorDistort')
-        self.sample_transforms_seq.append('randomExpand')
-        self.sample_transforms_seq.append('randomCrop')
+        # self.sample_transforms_seq.append('randomExpand')
+        # self.sample_transforms_seq.append('randomCrop')
         self.sample_transforms_seq.append('randomFlipImage')
         self.sample_transforms_seq.append('normalizeBox')
         self.sample_transforms_seq.append('padBox')
