@@ -54,7 +54,8 @@ class PPYOLO_mdf_2x_Config(object):
             eval_iter=20000,   # 每隔几步计算一次eval集的mAP
             max_iters=500000,   # 训练多少步
             mixup_epoch=10,     # 前几轮进行mixup
-            cutmix_epoch=-1,    # 前几轮进行cutmix
+            cutmix_epoch=10,    # 前几轮进行cutmix
+            mosaic_epoch=1000,  # 前几轮进行mosaic
         )
         self.learningRate = dict(
             base_lr=0.0001,
@@ -132,7 +133,6 @@ class PPYOLO_mdf_2x_Config(object):
             keep_prob=0.9,
             downsample=[32, 16, 8],
             in_channels=[2048, 1024, 512],
-            focalloss_on_obj=True,
         )
         self.iou_loss_type = 'IouLoss'
         self.iou_loss = dict(
@@ -153,7 +153,6 @@ class PPYOLO_mdf_2x_Config(object):
             scale_x_y=1.05,
             label_smooth=False,
             use_fine_grained_loss=True,
-            focalloss_on_obj=True,
         )
         self.nms_cfg = dict(
             nms_type='matrix_nms',
@@ -171,11 +170,22 @@ class PPYOLO_mdf_2x_Config(object):
         # DecodeImage
         self.decodeImage = dict(
             to_rgb=True,
-            with_mixup=True,
+            with_mixup=False,
             with_cutmix=False,
+            with_mosaic=True,
         )
         # MixupImage
         self.mixupImage = dict(
+            alpha=1.5,
+            beta=1.5,
+        )
+        # CutmixImage
+        self.cutmixImage = dict(
+            alpha=1.5,
+            beta=1.5,
+        )
+        # MosaicImage
+        self.mosaicImage = dict(
             alpha=1.5,
             beta=1.5,
         )
@@ -234,7 +244,12 @@ class PPYOLO_mdf_2x_Config(object):
         # 预处理顺序。增加一些数据增强时这里也要加上，否则train.py中相当于没加！
         self.sample_transforms_seq = []
         self.sample_transforms_seq.append('decodeImage')
-        self.sample_transforms_seq.append('mixupImage')
+        if self.decodeImage['with_mixup']:
+            self.sample_transforms_seq.append('mixupImage')
+        elif self.decodeImage['with_cutmix']:
+            self.sample_transforms_seq.append('cutmixImage')
+        elif self.decodeImage['with_mosaic']:
+            self.sample_transforms_seq.append('mosaicImage')
         self.sample_transforms_seq.append('colorDistort')
         self.sample_transforms_seq.append('randomExpand')
         self.sample_transforms_seq.append('randomCrop')
