@@ -255,6 +255,10 @@ def get_norm(norm_type):
         bn = 1
     elif norm_type == 'gn':
         gn = 1
+    elif norm_type == 'in':
+        gn = 1
+    elif norm_type == 'ln':
+        gn = 1
     elif norm_type == 'affine_channel':
         af = 1
     return bn, gn, af
@@ -294,7 +298,6 @@ class Conv2dUnit(paddle.nn.Layer):
                  use_dcn=False,
                  name=''):
         super(Conv2dUnit, self).__init__()
-        self.groups = groups
         self.filters = filters
         self.filter_size = filter_size
         self.stride = stride
@@ -342,8 +345,12 @@ class Conv2dUnit(paddle.nn.Layer):
 
 
         # norm
-        assert norm_type in [None, 'bn', 'sync_bn', 'gn', 'affine_channel']
+        assert norm_type in [None, 'bn', 'sync_bn', 'gn', 'affine_channel', 'in', 'ln']
         bn, gn, af = get_norm(norm_type)
+        if norm_type == 'in':
+            groups = filters
+        if norm_type == 'ln':
+            groups = 1
         if conv_name == "conv1":
             norm_name = "bn_" + conv_name
             if gn:
