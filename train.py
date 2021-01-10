@@ -299,6 +299,20 @@ if __name__ == '__main__':
     backbone.freeze()
     backbone.fix_bn()
 
+    print('\n=============== Model ===============')
+    trainable_params = 0
+    nontrainable_params = 0
+    for name_, param_ in model.named_parameters():
+        mul = np.prod(param_.shape)
+        if param_.stop_gradient is False:
+            trainable_params += mul
+        else:
+            nontrainable_params += mul
+    total_params = trainable_params + nontrainable_params
+    print('Total params: %s' % format(total_params, ","))
+    print('Trainable params: %s' % format(trainable_params, ","))
+    print('Non-trainable params: %s\n' % format(nontrainable_params, ","))
+
     ema = None
     if cfg.use_ema:
         ema = ExponentialMovingAverage(model, cfg.ema_decay)
