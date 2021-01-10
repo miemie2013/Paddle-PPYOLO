@@ -113,6 +113,7 @@ class PPYOLO_2x_Config(object):
             dcn_v2_stages=[5],
             downsample_in3x3=True,   # 注意这个细节，是在3x3卷积层下采样的。
             freeze_at=0,
+            fix_bn_mean_var_at=0,
             freeze_norm=False,
             norm_decay=0.,
         )

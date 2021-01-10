@@ -110,6 +110,7 @@ class YOLOv4_2x_Config(object):
             norm_type='bn',
             feature_maps=[3, 4, 5],
             freeze_at=5,
+            fix_bn_mean_var_at=0,
         )
         self.head_type = 'YOLOv4Head'
         self.head = dict(

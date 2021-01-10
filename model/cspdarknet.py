@@ -29,6 +29,10 @@ class ResidualBlock(paddle.nn.Layer):
         self.conv1.freeze()
         self.conv2.freeze()
 
+    def fix_bn(self):
+        self.conv1.fix_bn()
+        self.conv2.fix_bn()
+
 
 class StackResidualBlock(paddle.nn.Layer):
     def __init__(self, input_dim, filters_1, filters_2, n, norm_type, name=''):
@@ -47,17 +51,23 @@ class StackResidualBlock(paddle.nn.Layer):
         for residual_block in self.sequential:
             residual_block.freeze()
 
+    def fix_bn(self):
+        for residual_block in self.sequential:
+            residual_block.fix_bn()
+
 
 
 class CSPDarknet53(paddle.nn.Layer):
-    def __init__(self, norm_type='bn', feature_maps=[3, 4, 5], freeze_at=0, lr_mult_list=[1., 1., 1., 1.]):
+    def __init__(self, norm_type='bn', feature_maps=[3, 4, 5], freeze_at=0, fix_bn_mean_var_at=0, lr_mult_list=[1., 1., 1., 1.]):
         super(CSPDarknet53, self).__init__()
         self.norm_type = norm_type
         self.feature_maps = feature_maps
         assert freeze_at in [0, 1, 2, 3, 4, 5]
+        assert fix_bn_mean_var_at in [0, 1, 2, 3, 4, 5]
         # assert len(lr_mult_list) == 4, "lr_mult_list length must be 4 but got {}".format(len(lr_mult_list))
         # self.lr_mult_list = lr_mult_list
         self.freeze_at = freeze_at
+        self.fix_bn_mean_var_at = fix_bn_mean_var_at
         self.conv1 = Conv2dUnit(3,  32, 3, stride=1, norm_type=norm_type, act='mish', name='backbone.conv1')
 
         # stage1
@@ -197,6 +207,45 @@ class CSPDarknet53(paddle.nn.Layer):
             self.stage5_blocks.freeze()
             self.stage5_conv4.freeze()
             self.stage5_conv5.freeze()
+
+    def fix_bn(self):
+        fix_bn_mean_var_at = self.fix_bn_mean_var_at
+        if fix_bn_mean_var_at >= 1:
+            self.conv1.fix_bn()
+            self.stage1_conv1.fix_bn()
+            self.stage1_conv2.fix_bn()
+            self.stage1_conv3.fix_bn()
+            self.stage1_blocks.fix_bn()
+            self.stage1_conv4.fix_bn()
+            self.stage1_conv5.fix_bn()
+        if fix_bn_mean_var_at >= 2:
+            self.stage2_conv1.fix_bn()
+            self.stage2_conv2.fix_bn()
+            self.stage2_conv3.fix_bn()
+            self.stage2_blocks.fix_bn()
+            self.stage2_conv4.fix_bn()
+            self.stage2_conv5.fix_bn()
+        if fix_bn_mean_var_at >= 3:
+            self.stage3_conv1.fix_bn()
+            self.stage3_conv2.fix_bn()
+            self.stage3_conv3.fix_bn()
+            self.stage3_blocks.fix_bn()
+            self.stage3_conv4.fix_bn()
+            self.stage3_conv5.fix_bn()
+        if fix_bn_mean_var_at >= 4:
+            self.stage4_conv1.fix_bn()
+            self.stage4_conv2.fix_bn()
+            self.stage4_conv3.fix_bn()
+            self.stage4_blocks.fix_bn()
+            self.stage4_conv4.fix_bn()
+            self.stage4_conv5.fix_bn()
+        if fix_bn_mean_var_at >= 5:
+            self.stage5_conv1.fix_bn()
+            self.stage5_conv2.fix_bn()
+            self.stage5_conv3.fix_bn()
+            self.stage5_blocks.fix_bn()
+            self.stage5_conv4.fix_bn()
+            self.stage5_conv5.fix_bn()
 
 
 

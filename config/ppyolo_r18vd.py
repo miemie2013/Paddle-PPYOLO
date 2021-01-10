@@ -111,6 +111,7 @@ class PPYOLO_r18vd_Config(object):
             feature_maps=[4, 5],
             dcn_v2_stages=[],
             freeze_at=0,
+            fix_bn_mean_var_at=0,
             freeze_norm=False,
             norm_decay=0.,
         )

@@ -35,6 +35,12 @@ class ConvBlock(paddle.nn.Layer):
         self.conv3.freeze()
         self.conv4.freeze()
 
+    def fix_bn(self):
+        self.conv1.fix_bn()
+        self.conv2.fix_bn()
+        self.conv3.fix_bn()
+        self.conv4.fix_bn()
+
     def __call__(self, input_tensor):
         x = self.conv1(input_tensor)
         x = self.conv2(x)
@@ -46,14 +52,24 @@ class ConvBlock(paddle.nn.Layer):
 
 
 class Resnet50Vb(paddle.nn.Layer):
-    def __init__(self, norm_type='bn', feature_maps=[3, 4, 5], dcn_v2_stages=[5], downsample_in3x3=True, freeze_at=0, freeze_norm=False, norm_decay=0., lr_mult_list=[1., 1., 1., 1.]):
+    def __init__(self, norm_type='bn',
+                 feature_maps=[3, 4, 5],
+                 dcn_v2_stages=[5],
+                 downsample_in3x3=True,
+                 freeze_at=0,
+                 fix_bn_mean_var_at=0,
+                 freeze_norm=False,
+                 norm_decay=0.,
+                 lr_mult_list=[1., 1., 1., 1.]):
         super(Resnet50Vb, self).__init__()
         self.norm_type = norm_type
         self.feature_maps = feature_maps
         assert freeze_at in [0, 1, 2, 3, 4, 5]
+        assert fix_bn_mean_var_at in [0, 1, 2, 3, 4, 5]
         assert len(lr_mult_list) == 4, "lr_mult_list length must be 4 but got {}".format(len(lr_mult_list))
         self.lr_mult_list = lr_mult_list
         self.freeze_at = freeze_at
+        self.fix_bn_mean_var_at = fix_bn_mean_var_at
         self.stage1_conv1_1 = Conv2dUnit(3,  64, 7, stride=2, norm_type=norm_type, freeze_norm=freeze_norm, norm_decay=norm_decay, act='relu', name='conv1')
         self.pool = paddle.nn.MaxPool2D(kernel_size=3, stride=2, padding=1)
 
@@ -144,6 +160,31 @@ class Resnet50Vb(paddle.nn.Layer):
             self.stage5_0.freeze()
             self.stage5_1.freeze()
             self.stage5_2.freeze()
+
+    def fix_bn(self):
+        fix_bn_mean_var_at = self.fix_bn_mean_var_at
+        if fix_bn_mean_var_at >= 1:
+            self.stage1_conv1_1.fix_bn()
+        if fix_bn_mean_var_at >= 2:
+            self.stage2_0.fix_bn()
+            self.stage2_1.fix_bn()
+            self.stage2_2.fix_bn()
+        if fix_bn_mean_var_at >= 3:
+            self.stage3_0.fix_bn()
+            self.stage3_1.fix_bn()
+            self.stage3_2.fix_bn()
+            self.stage3_3.fix_bn()
+        if fix_bn_mean_var_at >= 4:
+            self.stage4_0.fix_bn()
+            self.stage4_1.fix_bn()
+            self.stage4_2.fix_bn()
+            self.stage4_3.fix_bn()
+            self.stage4_4.fix_bn()
+            self.stage4_5.fix_bn()
+        if fix_bn_mean_var_at >= 5:
+            self.stage5_0.fix_bn()
+            self.stage5_1.fix_bn()
+            self.stage5_2.fix_bn()
 
 
 

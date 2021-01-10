@@ -419,6 +419,10 @@ class Conv2dUnit(paddle.nn.Layer):
             self.scale.stop_gradient = True
             self.offset.stop_gradient = True
 
+    def fix_bn(self):
+        if self.bn is not None:
+            self.bn.eval()
+
     def forward(self, x):
         if self.use_dcn:
             offset_mask = self.conv(x)

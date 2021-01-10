@@ -297,6 +297,7 @@ if __name__ == '__main__':
 
     # 冻结，使得需要的显存减少。低显存的卡建议这样配置。
     backbone.freeze()
+    backbone.fix_bn()
 
     ema = None
     if cfg.use_ema:
@@ -509,6 +510,7 @@ if __name__ == '__main__':
                 box_ap = eval(_decode, val_images, cfg.val_pre_path, cfg.val_path, cfg.eval_cfg['eval_batch_size'], _clsid2catid, cfg.eval_cfg['draw_image'], cfg.eval_cfg['draw_thresh'])
                 logger.info("box ap: %.3f" % (box_ap[0], ))
                 model.train()  # 切换到训练模式
+                backbone.fix_bn()  # model.train()后需要重新固定backbone的bn层。
                 head.set_dropblock(is_test=False)
 
                 # 以box_ap作为标准
