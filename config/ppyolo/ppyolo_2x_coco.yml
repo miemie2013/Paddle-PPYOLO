@@ -68,7 +68,7 @@ MatrixNMS:
     post_threshold: 0.01
 
 LearningRate:
-  base_lr: 0.01
+  base_lr: 0.0001
   schedulers:
   - !PiecewiseDecay
     gamma: 0.1
