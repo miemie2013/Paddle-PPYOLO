@@ -41,6 +41,11 @@ cd data4379
 unzip pascalvoc.zip
 cd ~/w*
 
+cd ~/w*
+mkdir ~/data/data4379/pascalvoc/VOCdevkit/VOC2012/annotation_json/
+cp voc2012_train.json ~/data/data4379/pascalvoc/VOCdevkit/VOC2012/annotation_json/voc2012_train.json
+cp voc2012_val.json ~/data/data4379/pascalvoc/VOCdevkit/VOC2012/annotation_json/voc2012_val.json
+
 
 
 cd ~/w*

@@ -3,7 +3,7 @@ use_gpu: true
 max_iters: 500000
 log_iter: 100
 save_dir: output
-snapshot_iter: 10000
+snapshot_iter: 2000
 metric: COCO
 pretrain_weights: output/ppyolo/ppyolo
 weights: output/ppyolo/model_final
