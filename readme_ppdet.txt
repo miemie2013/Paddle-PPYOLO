@@ -58,9 +58,20 @@ unzip P*.zip
 
 -------------------------------- PPYOLO --------------------------------
 训练
+cd ~/w*
 python tools/train.py -c configs/ppyolo/ppyolo_2x.yml --eval
 
 
+
+预测
+cd ~/w*
+python tools/infer.py -c configs/ppyolo/ppyolo_2x.yml --infer_dir=./demo/
+
+
+
+验证
+cd ~/w*
+python tools/eval.py -c configs/ppyolo/ppyolo_2x.yml
 
 
 
