@@ -215,13 +215,13 @@ python deploy/python/infer.py --model_dir=./inference_model/ppyolo_2x --image_fi
 TensrRT FP32
 python tools/export_model.py  -c configs/ppyolo/ppyolo.yml --output_dir=./inference_model -o weights=output/ppyolo/model_final --exclude_nms
 CUDA_VISIBLE_DEVICES=0
-python deploy/python/infer.py --model_dir=inference_model/ppyolo --image_file=demo/000000014439_640x640.jpg --use_gpu=True --run_benchmark=True
+python deploy/python/infer.py --model_dir=inference_model/ppyolo_2x --image_file=./images/test/000000000019.jpg --use_gpu=True --run_benchmark=True
 
 
 TensrRT FP16
 python tools/export_model.py  -c configs/ppyolo/ppyolo.yml --output_dir=./inference_model -o weights=output/ppyolo/model_final --exclude_nms
 CUDA_VISIBLE_DEVICES=0
-python deploy/python/infer.py --model_dir=inference_model/ppyolo --image_file=demo/000000014439_640x640.jpg --use_gpu=True --run_benchmark=True --run_mode=trt_fp16
+python deploy/python/infer.py --model_dir=inference_model/ppyolo_2x --image_file=./images/test/000000000019.jpg --use_gpu=True --run_benchmark=True --run_mode=trt_fp16
 
 
 
