@@ -209,7 +209,7 @@ python test_dev.py --config=6
 
 导出后的预测
 python tools/export_model.py  -c configs/ppyolo/ppyolo.yml --output_dir=./inference_model -o weights=output/ppyolo/model_final
-python deploy/python/infer.py --model_dir=./inference_model/ppyolo_2x --image_file=./images/test/000000000019.jpg --use_gpu=True
+python deploy/python/infer.py --model_dir=inference_model/ppyolo_2x --image_file=./images/test/000000000019.jpg --use_gpu=True
 
 
 TensrRT FP32
