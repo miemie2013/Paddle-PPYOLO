@@ -18,7 +18,7 @@ import numpy as np
 import paddle.fluid as fluid
 
 from config import *
-from static_model.ppyolo import PPYOLO
+from static_model.ppyolo import *
 import static_model.get_model as M
 from tools.cocotools import get_classes
 
@@ -137,9 +137,17 @@ def dump_infer_config(save_dir, cfg):
 if __name__ == '__main__':
     paddle.enable_static()
 
+    # 选择配置
+    cfg = PPYOLO_2x_Config()
+    classes_path = cfg.classes_path
+    target_size = cfg.test_cfg['target_size']
+    # 读取的模型
+    model_path = 'static_ppyolo_2x'
+
 
     # 推理模型保存目录
-    save_dir = 'inference_model'
+    save_dir = str(type(cfg)).split('.')[1]
+    save_dir = 'inference_model/'+save_dir
 
     min_subgraph_size = 3
 
@@ -149,19 +157,6 @@ if __name__ == '__main__':
     # 使用GPU时，默认为fluid, 可选（fluid/trt_fp32/trt_fp16）
     mode = 'fluid'
 
-
-    # 选择配置
-    cfg = PPYOLO_2x_Config()
-
-
-    # =============== 导出的是demo.py中使用的配置。即test_cfg里的。 ===============
-    classes_path = cfg.classes_path
-
-    # 读取的模型
-    model_path = cfg.test_cfg['model_path']
-
-    # target_size越大，精度会上升，但速度会下降。
-    target_size = cfg.test_cfg['target_size']
 
 
     # 对模型输出的预测框再进行一次分数过滤的阈值。设置为0.0表示不再进行分数过滤。
@@ -185,7 +180,7 @@ if __name__ == '__main__':
             model = PPYOLO(backbone, head)
 
             image = L.data(name='image', shape=[-1, 3, -1, -1], append_batch_size=False, dtype='float32')
-            im_size = L.data(name='im_size', shape=[-1, 3], append_batch_size=False, dtype='float32')
+            im_size = L.data(name='im_size', shape=[-1, 2], append_batch_size=False, dtype='int32')
             feed_vars = [('image', image), ('im_size', im_size)]
             feed_vars = OrderedDict(feed_vars)
             pred = model(image, im_size)
@@ -202,14 +197,16 @@ if __name__ == '__main__':
 
     # 导出配置文件
     cfg2 = {}
-    cfg2['arch'] = 'FCOS'
+    cfg2['arch'] = 'YOLO'
     cfg2['min_subgraph_size'] = min_subgraph_size
     cfg2['use_python_inference'] = use_python_inference
     cfg2['mode'] = mode
     cfg2['draw_threshold'] = draw_threshold
 
-
     cfg2['to_rgb'] = cfg.decodeImage['to_rgb']
+
+    cfg2['input_shape_h'] = target_size
+    cfg2['input_shape_w'] = target_size
 
     cfg2['is_channel_first'] = cfg.normalizeImage['is_channel_first']
     cfg2['is_scale'] = cfg.normalizeImage['is_scale']
@@ -221,15 +218,11 @@ if __name__ == '__main__':
     cfg2['std2'] = cfg.normalizeImage['std'][2]
 
     cfg2['target_size'] = target_size
-    cfg2['max_size'] = max_size
     cfg2['interp'] = cfg.resizeImage['interp']
-    cfg2['use_cv2'] = cfg.resizeImage['use_cv2']
+    cfg2['use_cv2'] = getattr(cfg.resizeImage, 'use_cv2', True)
 
     cfg2['channel_first'] = cfg.permute['channel_first']
     cfg2['to_bgr'] = cfg.permute['to_bgr']
-
-    cfg2['pad_to_stride'] = cfg.padBatch['pad_to_stride']
-    cfg2['use_padded_im_info'] = cfg.padBatch['use_padded_im_info']
 
     cfg2['class_names'] = all_classes
 

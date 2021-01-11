@@ -15,6 +15,36 @@ from paddle.fluid.regularizer import L2Decay
 from paddle.fluid.initializer import Constant
 
 
+
+def get_norm(norm_type):
+    bn = 0
+    gn = 0
+    af = 0
+    if norm_type == 'bn':
+        bn = 1
+    elif norm_type == 'sync_bn':
+        bn = 1
+    elif norm_type == 'gn':
+        gn = 1
+    elif norm_type == 'in':
+        gn = 1
+    elif norm_type == 'ln':
+        gn = 1
+    elif norm_type == 'affine_channel':
+        af = 1
+    return bn, gn, af
+
+
+
+def _softplus(input):
+    expf = fluid.layers.exp(fluid.layers.clip(input, -200, 50))
+    return fluid.layers.log(1 + expf)
+
+
+def _mish(input):
+    return input * fluid.layers.tanh(_softplus(input))
+
+
 class Conv2dUnit(object):
     def __init__(self,
                  input_dim,
@@ -22,52 +52,78 @@ class Conv2dUnit(object):
                  filter_size,
                  stride=1,
                  bias_attr=False,
-                 bn=0,
-                 gn=0,
-                 af=0,
+                 norm_type=None,
                  groups=32,
                  act=None,
                  freeze_norm=False,
                  is_test=False,
                  norm_decay=0.,
+                 lr=1.,
+                 bias_lr=None,
+                 weight_init=None,
+                 bias_init=None,
                  use_dcn=False,
-                 bias_init_value=None,
                  name=''):
         super(Conv2dUnit, self).__init__()
         self.input_dim = input_dim
         self.filters = filters
         self.filter_size = filter_size
         self.stride = stride
+        self.padding = (self.filter_size - 1) // 2
         self.bias_attr = bias_attr
-        self.bn = bn
-        self.gn = gn
-        self.af = af
         self.groups = groups
         self.act = act
         self.freeze_norm = freeze_norm
         self.is_test = is_test
         self.norm_decay = norm_decay
+        self.bias_init = bias_init
         self.use_dcn = use_dcn
-        self.bias_init_value = bias_init_value
         self.name = name
+
+        assert norm_type in [None, 'bn', 'sync_bn', 'gn', 'affine_channel', 'in', 'ln']
+        self.bn, self.gn, self.af = get_norm(norm_type)
+        if norm_type == 'in':
+            self.groups = filters
+        if norm_type == 'ln':
+            self.groups = 1
 
     def __call__(self, x):
         conv_name = self.name + ".conv"
         if self.use_dcn:
-            pass
+            offset_mask = fluid.layers.conv2d(
+                input=x,
+                num_filters=self.filter_size * self.filter_size * 3,
+                filter_size=self.filter_size,
+                stride=self.stride,
+                padding=self.padding,
+                act=None,
+                param_attr=ParamAttr(initializer=Constant(0.0), name=conv_name + ".weight"),
+                bias_attr=ParamAttr(initializer=Constant(0.0), name=conv_name + ".bias"),
+                name=conv_name + "_conv_offset")
+            offset = offset_mask[:, :self.filter_size**2 * 2, :, :]
+            mask = offset_mask[:, self.filter_size**2 * 2:, :, :]
+            mask = fluid.layers.sigmoid(mask)
+            x = fluid.layers.deformable_conv(input=x, offset=offset, mask=mask,
+                                             num_filters=self.filters,
+                                             filter_size=self.filter_size,
+                                             stride=self.stride,
+                                             padding=self.padding,
+                                             groups=1,
+                                             deformable_groups=1,
+                                             im2col_step=1,
+                                             param_attr=ParamAttr(name=self.name + ".dcn_param"),
+                                             bias_attr=False,
+                                             name=conv_name + ".conv2d.output.1")
         else:
             battr = None
             if self.bias_attr:
-                initializer = None
-                if self.bias_init_value:
-                    initializer = Constant(value=self.bias_init_value)
-                battr = ParamAttr(name=conv_name + ".bias", initializer=initializer)
+                battr = ParamAttr(name=conv_name + ".bias", initializer=self.bias_init)
             x = fluid.layers.conv2d(
                 input=x,
                 num_filters=self.filters,
                 filter_size=self.filter_size,
                 stride=self.stride,
-                padding=(self.filter_size - 1) // 2,
+                padding=self.padding,
                 act=None,
                 param_attr=ParamAttr(name=conv_name + ".weight"),
                 bias_attr=battr,
@@ -77,33 +133,33 @@ class Conv2dUnit(object):
             norm_lr = 0. if self.freeze_norm else 1.   # 归一化层学习率
             norm_decay = self.norm_decay   # 衰减
             pattr = ParamAttr(
-                name=bn_name + '.scale',
+                name=bn_name + '.weight',
                 learning_rate=norm_lr,
-                regularizer=L2Decay(norm_decay))   # L2权重衰减正则化
+                regularizer=L2Decay(norm_decay))   # L2权重衰减
             battr = ParamAttr(
-                name=bn_name + '.offset',
+                name=bn_name + '.bias',
                 learning_rate=norm_lr,
-                regularizer=L2Decay(norm_decay))   # L2权重衰减正则化
+                regularizer=L2Decay(norm_decay))   # L2权重衰减
             x = fluid.layers.batch_norm(
                 input=x,
                 name=bn_name + '.output.1',
                 is_test=self.is_test,  # 冻结层时（即trainable=False），bn的均值、标准差也还是会变化，只有设置is_test=True才保证不变
                 param_attr=pattr,
                 bias_attr=battr,
-                moving_mean_name=bn_name + '.mean',
-                moving_variance_name=bn_name + '.var')
+                moving_mean_name=bn_name + '._mean',
+                moving_variance_name=bn_name + '._variance')
         if self.gn:
             gn_name = self.name + ".gn"
             norm_lr = 0. if self.freeze_norm else 1.   # 归一化层学习率
             norm_decay = self.norm_decay   # 衰减
             pattr = ParamAttr(
-                name=gn_name + '.scale',
+                name=gn_name + '.weight',
                 learning_rate=norm_lr,
-                regularizer=L2Decay(norm_decay))   # L2权重衰减正则化
+                regularizer=L2Decay(norm_decay))   # L2权重衰减
             battr = ParamAttr(
-                name=gn_name + '.offset',
+                name=gn_name + '.bias',
                 learning_rate=norm_lr,
-                regularizer=L2Decay(norm_decay))   # L2权重衰减正则化
+                regularizer=L2Decay(norm_decay))   # L2权重衰减
             x = fluid.layers.group_norm(
                 input=x,
                 groups=self.groups,
@@ -115,13 +171,13 @@ class Conv2dUnit(object):
             norm_lr = 0. if self.freeze_norm else 1.   # 归一化层学习率
             norm_decay = self.norm_decay   # 衰减
             pattr = ParamAttr(
-                name=af_name + '.scale',
+                name=af_name + '.weight',
                 learning_rate=norm_lr,
-                regularizer=L2Decay(norm_decay))   # L2权重衰减正则化
+                regularizer=L2Decay(norm_decay))   # L2权重衰减
             battr = ParamAttr(
-                name=af_name + '.offset',
+                name=af_name + '.bias',
                 learning_rate=norm_lr,
-                regularizer=L2Decay(norm_decay))   # L2权重衰减正则化
+                regularizer=L2Decay(norm_decay))   # L2权重衰减
             scale = fluid.layers.create_parameter(
                 shape=[x.shape[1]],
                 dtype=x.dtype,
@@ -133,10 +189,18 @@ class Conv2dUnit(object):
                 attr=battr,
                 default_initializer=fluid.initializer.Constant(0.))
             x = fluid.layers.affine_channel(x, scale=scale, bias=bias)
-        if self.act == 'leaky':
-            x = fluid.layers.leaky_relu(x, alpha=0.1)
-        elif self.act == 'relu':
+
+        # act
+        if self.act == 'relu':
             x = fluid.layers.relu(x)
+        elif self.act == 'leaky':
+            x = fluid.layers.leaky_relu(x, alpha=0.1)
+        elif self.act == 'mish':
+            x = _mish(x)
+        elif self.act is None:
+            pass
+        else:
+            raise NotImplementedError("Activation \'{}\' is not implemented.".format(self.act))
         return x
 
 
@@ -148,9 +212,9 @@ class CoordConv(object):
     def __call__(self, input):
         if not self.coord_conv:
             return input
-        b = input.shape[0]
-        h = input.shape[2]
-        w = input.shape[3]
+        b = L.shape(input)[0]
+        h = L.shape(input)[2]
+        w = L.shape(input)[3]
         x_range = L.range(0, w, 1., dtype='float32') / (w - 1) * 2.0 - 1
         y_range = L.range(0, h, 1., dtype='float32') / (h - 1) * 2.0 - 1
         x_range = L.reshape(x_range, (1, 1, 1, -1))  # [1, 1, 1, w]

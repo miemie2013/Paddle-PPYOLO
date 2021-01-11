@@ -1,0 +1,33 @@
+use_python_inference: ${use_python_inference}
+mode: ${mode}
+draw_threshold: ${draw_threshold}
+metric: COCO
+arch: ${arch}
+min_subgraph_size: ${min_subgraph_size}
+with_background: false
+Preprocess:
+- image_shape:
+  - ${input_shape_h}
+  - ${input_shape_w}
+  interp: 2
+  max_size: 0
+  resize_box: false
+  target_size: ${input_shape_h}
+  type: Resize
+  use_cv2: true
+- is_channel_first: false
+  is_scale: ${is_scale}
+  mean:
+  - ${mean0}
+  - ${mean1}
+  - ${mean2}
+  std:
+  - ${std0}
+  - ${std1}
+  - ${std2}
+  type: Normalize
+- channel_first: true
+  to_bgr: false
+  type: Permute
+label_list:
+${class_names}

@@ -108,23 +108,23 @@ class DetectionBlock(object):
         self.block_size = block_size
         self.keep_prob = keep_prob
 
-        self.layers = paddle.nn.LayerList()
-        self.tip_layers = paddle.nn.LayerList()
+        self.layers = []
+        self.tip_layers = []
         for j in range(conv_block_num):
             coordConv = CoordConv(coord_conv)
             input_c = in_c + 2 if coord_conv else in_c
-            conv_unit1 = Conv2dUnit(input_c, channel, 1, stride=1, norm_type=norm_type, act='leaky', norm_decay=self.norm_decay, name='{}.{}.0'.format(name, j))
+            conv_unit1 = Conv2dUnit(input_c, channel, 1, stride=1, norm_type=norm_type, act='leaky', norm_decay=self.norm_decay, name='{}.layers.{}'.format(name, len(self.layers)+1))
             self.layers.append(coordConv)
             self.layers.append(conv_unit1)
             if self.use_spp and is_first and j == 1:
                 spp = SPP()
-                conv_unit2 = Conv2dUnit(channel * 4, 512, 1, stride=1, norm_type=norm_type, act='leaky', norm_decay=self.norm_decay, name='{}.{}.spp.conv'.format(name, j))
-                conv_unit3 = Conv2dUnit(512, channel * 2, 3, stride=1, norm_type=norm_type, act='leaky', norm_decay=self.norm_decay, name='{}.{}.1'.format(name, j))
+                conv_unit2 = Conv2dUnit(channel * 4, 512, 1, stride=1, norm_type=norm_type, act='leaky', norm_decay=self.norm_decay, name='{}.layers.{}'.format(name, len(self.layers)+1))
+                conv_unit3 = Conv2dUnit(512, channel * 2, 3, stride=1, norm_type=norm_type, act='leaky', norm_decay=self.norm_decay, name='{}.layers.{}'.format(name, len(self.layers)+2))
                 self.layers.append(spp)
                 self.layers.append(conv_unit2)
                 self.layers.append(conv_unit3)
             else:
-                conv_unit3 = Conv2dUnit(channel, channel * 2, 3, stride=1, norm_type=norm_type, act='leaky', norm_decay=self.norm_decay, name='{}.{}.1'.format(name, j))
+                conv_unit3 = Conv2dUnit(channel, channel * 2, 3, stride=1, norm_type=norm_type, act='leaky', norm_decay=self.norm_decay, name='{}.layers.{}'.format(name, len(self.layers)+0))
                 self.layers.append(conv_unit3)
 
             if self.drop_block and j == 0 and not is_first:
@@ -146,13 +146,13 @@ class DetectionBlock(object):
             input_c = in_c + 2 if coord_conv else in_c
         else:
             input_c = channel * 2 + 2 if coord_conv else channel * 2
-        conv_unit = Conv2dUnit(input_c, channel, 1, stride=1, norm_type=norm_type, act='leaky', norm_decay=self.norm_decay, name='{}.2'.format(name))
+        conv_unit = Conv2dUnit(input_c, channel, 1, stride=1, norm_type=norm_type, act='leaky', norm_decay=self.norm_decay, name='{}.layers.{}'.format(name, len(self.layers)+1))
         self.layers.append(coordConv)
         self.layers.append(conv_unit)
 
         coordConv = CoordConv(coord_conv)
         input_c = channel + 2 if coord_conv else channel
-        conv_unit = Conv2dUnit(input_c, channel * 2, 3, stride=1, norm_type=norm_type, act='leaky', norm_decay=self.norm_decay, name='{}.tip'.format(name))
+        conv_unit = Conv2dUnit(input_c, channel * 2, 3, stride=1, norm_type=norm_type, act='leaky', norm_decay=self.norm_decay, name='{}.tip_layers.{}'.format(name, len(self.tip_layers)+1))
         self.tip_layers.append(coordConv)
         self.tip_layers.append(conv_unit)
 
@@ -192,7 +192,8 @@ class YOLOv3Head(object):
                  nms_cfg=None,
                  focalloss_on_obj=False,
                  prior_prob=0.01,
-                 is_train=False
+                 is_train=False,
+                 name='head'
                  ):
         super(YOLOv3Head, self).__init__()
         self.conv_block_num = conv_block_num
@@ -230,9 +231,9 @@ class YOLOv3Head(object):
                 temp += anchors[aid]
             self.mask_anchors.append(temp)
 
-        self.detection_blocks = paddle.nn.LayerList()
-        self.yolo_output_convs = paddle.nn.LayerList()
-        self.upsample_layers = paddle.nn.LayerList()
+        self.detection_blocks = []
+        self.yolo_output_convs = []
+        self.upsample_layers = []
         out_layer_num = len(downsample)
         for i in range(out_layer_num):
             in_c = self.in_channels[i]
@@ -251,7 +252,7 @@ class YOLOv3Head(object):
                 block_size=self.block_size,
                 keep_prob=self.keep_prob,
                 is_test=(not self.is_train),
-                name="yolo_block.{}".format(i)
+                name=name+".detection_blocks.{}".format(i)
             )
             # out channel number = mask_num * (5 + class_num)
             if self.iou_aware:
@@ -273,14 +274,16 @@ class YOLOv3Head(object):
                     bias_init_array[start + o * stride + 4] = bias_init_value
                 bias_init = fluid.initializer.NumpyArrayInitializer(bias_init_array)
             yolo_output_conv = Conv2dUnit(64 * (2**out_layer_num) // (2**i) * 2, num_filters, 1, stride=1, bias_attr=True, act=None,
-                                          bias_init=bias_init, name="yolo_output.{}.conv".format(i))
+                                          bias_init=bias_init, name=name+".yolo_output_convs.{}".format(i))
             self.detection_blocks.append(_detection_block)
             self.yolo_output_convs.append(yolo_output_conv)
 
 
             if i < out_layer_num - 1:
                 # do not perform upsample in the last detection_block
-                conv_unit = Conv2dUnit(64 * (2**out_layer_num) // (2**i), 256 // (2**i), 1, stride=1, norm_type=norm_type, act='leaky', norm_decay=self.norm_decay, name="yolo_transition.{}".format(i))
+                conv_unit = Conv2dUnit(64 * (2**out_layer_num) // (2**i), 256 // (2**i), 1, stride=1,
+                                       norm_type=norm_type, act='leaky', norm_decay=self.norm_decay,
+                                       name=name+".upsample_layers.{}".format(len(self.upsample_layers)))
                 # upsample
                 upsample = paddle.nn.Upsample(scale_factor=2, mode='nearest')
                 self.upsample_layers.append(conv_unit)
@@ -345,19 +348,14 @@ class YOLOv3Head(object):
 
 
         # nms
-        preds = []
         nms_cfg = copy.deepcopy(self.nms_cfg)
         nms_type = nms_cfg.pop('nms_type')
-        batch_size = yolo_boxes.shape[0]
+        batch_size = 1
         if nms_type == 'matrix_nms':
-            for i in range(batch_size):
-                pred = fluid.layers.matrix_nms(yolo_boxes[i:i+1, :, :], yolo_scores[i:i+1, :, :], background_label=-1, **nms_cfg)
-                preds.append(pred)
+            pred = fluid.layers.matrix_nms(yolo_boxes, yolo_scores, background_label=-1, **nms_cfg)
         elif nms_type == 'multiclass_nms':
-            for i in range(batch_size):
-                pred = fluid.layers.multiclass_nms(yolo_boxes[i:i+1, :, :], yolo_scores[i:i+1, :, :], background_label=-1, **nms_cfg)
-                preds.append(pred)
-        return preds
+            pred = fluid.layers.multiclass_nms(yolo_boxes, yolo_scores, background_label=-1, **nms_cfg)
+        return pred
 
 
 
