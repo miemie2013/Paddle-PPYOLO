@@ -48,6 +48,7 @@ class PPYOLO_r18vd_Config(object):
             max_batch=3,     # 最大读多少个批
             model_path='dygraph_ppyolo_r18vd.pdparams',
             # model_path='./weights/1000.pdparams',
+            update_iter=4,    # 每隔几步更新一次参数
             log_iter=20,      # 每隔几步打印一次
             save_iter=1000,   # 每隔几步保存一次模型
             eval_iter=5000,   # 每隔几步计算一次eval集的mAP

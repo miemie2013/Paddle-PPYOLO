@@ -484,8 +484,9 @@ if __name__ == '__main__':
             lr = calc_lr(iter_id, cfg)
             optimizer.set_lr(lr)
             all_loss.backward()
-            optimizer.step()
-            optimizer.clear_grad()
+            if iter_id % cfg.train_cfg['update_iter'] == 0:
+                optimizer.step()
+                optimizer.clear_grad()
             if cfg.use_ema and iter_id % cfg.ema_iter == 0:
                 ema.update()   # 更新ema字典
 
