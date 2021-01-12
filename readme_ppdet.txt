@@ -63,6 +63,13 @@ python tools/train.py -c configs/ppyolo/ppyolo_2x.yml --eval
 
 
 
+
+恢复训练
+cd ~/w*
+python tools/train.py -c configs/ppyolo/ppyolo_2x.yml --eval -r output/ppyolo_2x/24000
+
+
+
 预测
 cd ~/w*
 python tools/infer.py -c configs/ppyolo/ppyolo_2x.yml --infer_dir=./demo/
