@@ -16,6 +16,18 @@ wget https://paddlemodels.bj.bcebos.com/object_detection/ppyolo_r18vd.pdparams
 
 
 
+下载预训练模型cascade_rcnn_cbr200_vd_fpn_dcnv2_nonlocal_softnms.tar
+cd ~/w*
+wget https://paddlemodels.bj.bcebos.com/object_detection/cascade_rcnn_cbr200_vd_fpn_dcnv2_nonlocal_softnms.tar
+tar -xf cascade_rcnn_cbr200_vd_fpn_dcnv2_nonlocal_softnms.tar
+mkdir ./output/
+mkdir ./output/cascade_rcnn_cbr200_vd_fpn_dcnv2_nonlocal_softnms/
+mv cascade_rcnn_cbr200_vd_fpn_dcnv2_nonlocal_softnms ./output/cascade_rcnn_cbr200_vd_fpn_dcnv2_nonlocal_softnms/cascade_rcnn_cbr200_vd_fpn_dcnv2_nonlocal_softnms
+rm -f cascade_rcnn_cbr200_vd_fpn_dcnv2_nonlocal_softnms.tar
+
+
+
+
 
 # 安装依赖、解压COCO2017数据集
 nvidia-smi
@@ -40,8 +52,6 @@ cd data
 cd data4379
 unzip pascalvoc.zip
 cd ~/w*
-
-cd ~/w*
 mkdir ~/data/data4379/pascalvoc/VOCdevkit/VOC2012/annotation_json/
 cp voc2012_train.json ~/data/data4379/pascalvoc/VOCdevkit/VOC2012/annotation_json/voc2012_train.json
 cp voc2012_val.json ~/data/data4379/pascalvoc/VOCdevkit/VOC2012/annotation_json/voc2012_val.json
@@ -61,12 +71,19 @@ unzip P*.zip
 cd ~/w*
 python tools/train.py -c configs/ppyolo/ppyolo_2x.yml --eval
 
+cd ~/w*
+python tools/train.py -c configs/dcn/cascade_rcnn_cbr200_vd_fpn_dcnv2_nonlocal_softnms.yml --eval
+
 
 
 
 恢复训练
 cd ~/w*
 python tools/train.py -c configs/ppyolo/ppyolo_2x.yml --eval -r output/ppyolo_2x/24000
+
+cd ~/w*
+python tools/train.py -c configs/dcn/cascade_rcnn_cbr200_vd_fpn_dcnv2_nonlocal_softnms.yml --eval -r output/aaaaa/24000
+
 
 
 
