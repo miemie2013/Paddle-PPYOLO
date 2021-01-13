@@ -51,7 +51,7 @@ TrainReader:
   shuffle: true
   mixup_epoch: 25000
   drop_last: true
-  worker_num: 1
+  worker_num: 8
   bufsize: 4
   use_process: true
 
@@ -83,7 +83,7 @@ EvalReader:
       channel_first: True
   batch_size: 8
   drop_empty: false
-  worker_num: 1
+  worker_num: 8
   bufsize: 4
 
 TestReader:
