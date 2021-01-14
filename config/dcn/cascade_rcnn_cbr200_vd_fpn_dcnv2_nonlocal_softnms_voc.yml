@@ -1,6 +1,6 @@
 architecture: CascadeRCNN
 max_iters: 460000
-snapshot_iter: 500
+snapshot_iter: 6000
 use_gpu: true
 log_iter: 20
 save_dir: output
@@ -21,7 +21,7 @@ CBResNet:
   norm_type: bn
   depth: 200
   feature_maps: [2, 3, 4, 5]
-  freeze_at: 2
+  freeze_at: 4
   variant: d
   dcn_v2_stages: [3, 4, 5]
   nonlocal_stages: [4]
