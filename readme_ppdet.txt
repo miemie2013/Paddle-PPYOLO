@@ -26,6 +26,22 @@ mv cascade_rcnn_cbr200_vd_fpn_dcnv2_nonlocal_softnms ./output/cascade_rcnn_cbr20
 rm -f cascade_rcnn_cbr200_vd_fpn_dcnv2_nonlocal_softnms.tar
 
 
+下载预训练模型fcos_r50_fpn_multiscale_2x.pdparams
+cd ~/w*
+wget https://paddlemodels.bj.bcebos.com/object_detection/fcos_r50_fpn_multiscale_2x.pdparams
+mkdir ./output/
+mkdir ./output/fcos_r50_fpn_multiscale_2x/
+mv fcos_r50_fpn_multiscale_2x.pdparams ./output/fcos_r50_fpn_multiscale_2x/fcos_r50_fpn_multiscale_2x.pdparams
+
+
+下载预训练模型fcos_dcn_r50_fpn_1x.pdparams
+cd ~/w*
+wget https://paddlemodels.bj.bcebos.com/object_detection/fcos_dcn_r50_fpn_1x.pdparams
+mkdir ./output/
+mkdir ./output/fcos_dcn_r50_fpn_1x/
+mv fcos_dcn_r50_fpn_1x.pdparams ./output/fcos_dcn_r50_fpn_1x/fcos_dcn_r50_fpn_1x.pdparams
+
+
 
 
 
@@ -73,6 +89,12 @@ python tools/train.py -c configs/ppyolo/ppyolo_2x.yml --eval
 
 cd ~/w*
 python tools/train.py -c configs/dcn/cascade_rcnn_cbr200_vd_fpn_dcnv2_nonlocal_softnms.yml --eval
+
+cd ~/w*
+python tools/train.py -c configs/anchor_free/fcos_dcn_r50_fpn_1x.yml --eval
+
+cd ~/w*
+python tools/train.py -c configs/anchor_free/fcos_r50_fpn_multiscale_2x.yml --eval
 
 
 
