@@ -1,12 +1,13 @@
 architecture: FCOS
 max_iters: 180000
 use_gpu: true
-snapshot_iter: 20000
+snapshot_iter: 2000
 log_iter: 20
 save_dir: output
-pretrain_weights: output/fcos_r50_fpn_multiscale_2x/fcos_r50_fpn_multiscale_2x
+pretrain_weights: output/fcos_r50_fpn_multiscale_2x/fcos_r50_fpn_multiscale_2x.pdparams
 metric: COCO
 weights: output/fcos_r50_fpn_multiscale_2x/model_final
+finetune_exclude_pretrained_params: ['fcos_head_cls_weights']
 num_classes: 20
 
 FCOS:
