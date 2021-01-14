@@ -89,7 +89,7 @@ MultiClassSoftNMS:
   softnms_sigma: 0.5
 
 LearningRate:
-  base_lr: 0.005
+  base_lr: 0.0005
   schedulers:
   - !PiecewiseDecay
     gamma: 0.1
