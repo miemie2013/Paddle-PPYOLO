@@ -96,6 +96,9 @@ python tools/train.py -c configs/anchor_free/fcos_dcn_r50_fpn_1x.yml --eval
 cd ~/w*
 python tools/train.py -c configs/anchor_free/fcos_r50_fpn_multiscale_2x.yml --eval
 
+cd ~/w*
+python tools/train.py -c configs/anchor_free/fcos_dcn_r50vd_fpn_1x_coco.yml --eval
+
 
 
 
@@ -106,6 +109,8 @@ python tools/train.py -c configs/ppyolo/ppyolo_2x.yml --eval -r output/ppyolo_2x
 cd ~/w*
 python tools/train.py -c configs/dcn/cascade_rcnn_cbr200_vd_fpn_dcnv2_nonlocal_softnms.yml --eval -r output/aaaaa/24000
 
+cd ~/w*
+python tools/train.py -c configs/anchor_free/fcos_dcn_r50vd_fpn_1x_coco.yml --eval -r output/ppyolo_2x/24000
 
 
 
