@@ -1,7 +1,7 @@
 architecture: FCOS
 max_iters: 90000
 use_gpu: true
-snapshot_iter: 5000
+snapshot_iter: 1000
 log_iter: 20
 save_dir: output
 pretrain_weights: https://paddle-imagenet-models-name.bj.bcebos.com/ResNet50_vd_ssld_pretrained.tar
@@ -59,7 +59,7 @@ FCOSLoss:
   reg_weights: 1.0
 
 LearningRate:
-  base_lr: 0.0001
+  base_lr: 0.01
   schedulers:
   - !PiecewiseDecay
     gamma: 0.1
@@ -117,7 +117,7 @@ TrainReader:
     center_sampling_radius: 1.5
     downsample_ratios: [8, 16, 32]
     norm_reg_targets: True
-  batch_size: 16
+  batch_size: 24
   mixup_epoch: 25000
   shuffle: true
   drop_last: true

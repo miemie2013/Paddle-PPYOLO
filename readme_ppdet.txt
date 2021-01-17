@@ -110,7 +110,7 @@ cd ~/w*
 python tools/train.py -c configs/dcn/cascade_rcnn_cbr200_vd_fpn_dcnv2_nonlocal_softnms.yml --eval -r output/aaaaa/24000
 
 cd ~/w*
-python tools/train.py -c configs/anchor_free/fcos_dcn_r50vd_fpn_1x_coco.yml --eval -r output/ppyolo_2x/24000
+python tools/train.py -c configs/anchor_free/fcos_dcn_r50vd_fpn_1x_coco.yml --eval -r output/fcos_dcn_r50vd_fpn_1x_coco/15000
 
 
 
