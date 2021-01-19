@@ -50,7 +50,7 @@ class PPYOLO_2x_Config(object):
             # model_path='dygraph_ppyolo_2x.pdparams',
             model_path='dygraph_r50vd_ssld.pdparams',
             # model_path='./weights/1000.pdparams',
-            update_iter=4,    # 每隔几步更新一次参数
+            update_iter=1,    # 每隔几步更新一次参数
             log_iter=20,      # 每隔几步打印一次
             save_iter=1000,   # 每隔几步保存一次模型
             eval_iter=20000,   # 每隔几步计算一次eval集的mAP
@@ -107,7 +107,7 @@ class PPYOLO_2x_Config(object):
         self.use_ema = True
         # self.use_ema = False
         self.ema_decay = 0.9998
-        self.ema_iter = 20
+        self.ema_iter = 1
         self.backbone_type = 'Resnet50Vd'
         self.backbone = dict(
             norm_type='bn',
