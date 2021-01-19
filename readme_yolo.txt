@@ -105,50 +105,50 @@ parser.add_argument('-c', '--config', type=int, default=0,
 
 训练
 cd ~/w*
-python train.py --config=0
+python train_yolo.py --config=0
 
 cd ~/w*
-python train.py --config=1
+python train_yolo.py --config=1
 
 cd ~/w*
-python train.py --config=2
+python train_yolo.py --config=2
 
 cd ~/w*
-python train.py --config=3
+python train_yolo.py --config=3
 
 cd ~/w*
-python train.py --config=4
+python train_yolo.py --config=4
 
 cd ~/w*
-python train.py --config=5
+python train_yolo.py --config=5
 
 cd ~/w*
-python train.py --config=6
+python train_yolo.py --config=6
 
 
 
 
 预测
 cd ~/w*
-python demo.py --config=0
+python demo_yolo.py --config=0
 
 cd ~/w*
-python demo.py --config=1
+python demo_yolo.py --config=1
 
 cd ~/w*
-python demo.py --config=2
+python demo_yolo.py --config=2
 
 cd ~/w*
-python demo.py --config=3
+python demo_yolo.py --config=3
 
 cd ~/w*
-python demo.py --config=4
+python demo_yolo.py --config=4
 
 cd ~/w*
-python demo.py --config=5
+python demo_yolo.py --config=5
 
 cd ~/w*
-python demo.py --config=6
+python demo_yolo.py --config=6
 
 
 
@@ -156,50 +156,50 @@ python demo.py --config=6
 
 验证
 cd ~/w*
-python eval.py --config=0
+python eval_yolo.py --config=0
 
 cd ~/w*
-python eval.py --config=1
+python eval_yolo.py --config=1
 
 cd ~/w*
-python eval.py --config=2
+python eval_yolo.py --config=2
 
 cd ~/w*
-python eval.py --config=3
+python eval_yolo.py --config=3
 
 cd ~/w*
-python eval.py --config=4
+python eval_yolo.py --config=4
 
 cd ~/w*
-python eval.py --config=5
+python eval_yolo.py --config=5
 
 cd ~/w*
-python eval.py --config=6
+python eval_yolo.py --config=6
 
 
 
 
 跑test_dev
 cd ~/w*
-python test_dev.py --config=0
+python test_dev_yolo.py --config=0
 
 cd ~/w*
-python test_dev.py --config=1
+python test_dev_yolo.py --config=1
 
 cd ~/w*
-python test_dev.py --config=2
+python test_dev_yolo.py --config=2
 
 cd ~/w*
-python test_dev.py --config=3
+python test_dev_yolo.py --config=3
 
 cd ~/w*
-python test_dev.py --config=4
+python test_dev_yolo.py --config=4
 
 cd ~/w*
-python test_dev.py --config=5
+python test_dev_yolo.py --config=5
 
 cd ~/w*
-python test_dev.py --config=6
+python test_dev_yolo.py --config=6
 
 
 
@@ -208,7 +208,7 @@ python test_dev.py --config=6
 
 
 导出后的预测
-python tools/export_model.py  -c configs/ppyolo/ppyolo.yml --output_dir=./inference_model -o weights=output/ppyolo/model_final
+python tools/export_model_yolo.py  -c configs/ppyolo/ppyolo.yml --output_dir=./inference_model -o weights=output/ppyolo/model_final
 python deploy/python/infer.py --model_dir=inference_model/ppyolo_2x --image_file=./images/test/000000000019.jpg --use_gpu=True
 
 

@@ -7,15 +7,17 @@
 #   Description : paddle2.0_ppyolo
 #
 # ================================================================
-from model.yolov3_loss import *
-from model.my_loss import *
-from model.iou_losses import *
-from model.yolov3_head import *
-from model.yolov4_head import *
-from model.resnet_vb import *
-from model.resnet_vd import *
-from model.cspdarknet import *
-from model.mobilenet_v3 import *
+from model.backbones.resnet_vb import *
+from model.backbones.resnet_vd import *
+from model.backbones.cspdarknet import *
+from model.backbones.mobilenet_v3 import *
+
+from model.anchor_heads.yolov3_head import *
+from model.anchor_heads.yolov4_head import *
+
+from model.losses.yolov3_loss import *
+from model.losses.my_loss import *
+from model.losses.iou_losses import *
 
 
 def select_backbone(name):
