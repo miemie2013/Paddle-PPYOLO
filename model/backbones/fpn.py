@@ -1,16 +1,5 @@
 import copy
-from paddle import fluid
-from paddle.fluid.param_attr import ParamAttr
 from paddle.fluid.initializer import Xavier
-from paddle.fluid.initializer import Constant
-from paddle.fluid.regularizer import L2Decay
-
-
-import paddle
-import paddle.nn.functional as F
-import paddle.fluid as fluid
-import paddle.fluid.layers as L
-
 from model.custom_layers import *
 
 
@@ -50,7 +39,6 @@ class FPN(paddle.nn.Layer):
         self.max_level = max_level
         self.spatial_scale = spatial_scale
         self.has_extra_convs = has_extra_convs
-        assert norm_type in ['bn', 'sync_bn', 'gn', 'affine_channel', None]
         self.norm_type = norm_type
         self.norm_decay = norm_decay
         self.use_c5 = use_c5
@@ -65,18 +53,16 @@ class FPN(paddle.nn.Layer):
             cname = 'fpn_inner_res%d_sum_lateral' % (5 - i, )
             if i == 0:
                 cname = 'fpn_inner_res%d_sum' % (5 - i, )
-            bn, gn, af = get_norm(norm_type)
-            use_bias = True if (bn + gn + af) == 0 else False
-            conv = Conv2dUnit(in_channels[i], self.num_chan, 1, stride=1, bias_attr=use_bias, bn=bn, gn=gn, af=af, bias_lr=2.0,
+            use_bias = True if norm_type is None else False
+            conv = Conv2dUnit(in_channels[i], self.num_chan, 1, stride=1, bias_attr=use_bias, norm_type=norm_type, bias_lr=2.0,
                               weight_init=Xavier(fan_out=in_channels[i] * 1 * 1), bias_init=Constant(0.0),
                               act=None, freeze_norm=self.freeze_norm, norm_decay=self.norm_decay, name=cname)
             self.fpn_inner_convs.append(conv)
 
         # fpn_convs
         for i in range(0, self.num_backbone_stages):
-            bn, gn, af = get_norm(norm_type)
-            use_bias = True if (bn + gn + af) == 0 else False
-            conv = Conv2dUnit(self.num_chan, self.num_chan, 3, stride=1, bias_attr=use_bias, bn=bn, gn=gn, af=af, bias_lr=2.0,
+            use_bias = True if norm_type is None else False
+            conv = Conv2dUnit(self.num_chan, self.num_chan, 3, stride=1, bias_attr=use_bias, norm_type=norm_type, bias_lr=2.0,
                               weight_init=Xavier(fan_out=self.num_chan * 3 * 3), bias_init=Constant(0.0),
                               act=None, freeze_norm=self.freeze_norm, norm_decay=self.norm_decay, name='fpn_res%d_sum' % (5 - i, ))
             self.fpn_convs.append(conv)
@@ -96,7 +82,7 @@ class FPN(paddle.nn.Layer):
                 in_c = self.num_chan
                 fan = in_c * 3 * 3
             for i in range(highest_backbone_level + 1, self.max_level + 1):
-                conv = Conv2dUnit(in_c, self.num_chan, 3, stride=2, bias_attr=True, bn=0, gn=0, af=0, bias_lr=2.0,
+                conv = Conv2dUnit(in_c, self.num_chan, 3, stride=2, bias_attr=True, norm_type=None, bias_lr=2.0,
                                   weight_init=Xavier(fan_out=fan), bias_init=Constant(0.0),
                                   act=None, freeze_norm=self.freeze_norm, norm_decay=self.norm_decay, name='fpn_%d' % (i, ))
                 self.extra_convs.append(conv)

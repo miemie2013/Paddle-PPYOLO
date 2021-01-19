@@ -59,8 +59,6 @@ class FCOSHead(paddle.nn.Layer):
         self.iou_aware_on_reg = iou_aware_on_reg
         self.iou_aware_factor = iou_aware_factor
         self.nms_cfg = nms_cfg
-        assert norm_type in ['bn', 'sync_bn', 'gn', 'affine_channel', None]
-        bn, gn, af = get_norm(norm_type)
 
 
         self.scales_on_reg = paddle.nn.ParameterList()       # 回归分支（预测框坐标）的系数
@@ -90,7 +88,7 @@ class FCOSHead(paddle.nn.Layer):
             # if self.coord_conv:
             #     in_ch = self.in_channel + 2 if lvl == 0 else self.in_channel
             in_ch = in_ch * 4 if self.use_spp and lvl == 1 else in_ch   # spp层暂定放在第一个卷积层之后
-            cls_conv_layer = Conv2dUnit(in_ch, self.in_channel, 3, stride=1, bias_attr=True, bn=bn, gn=gn, af=af, groups=32, bias_lr=2.0,
+            cls_conv_layer = Conv2dUnit(in_ch, self.in_channel, 3, stride=1, bias_attr=True, norm_type=norm_type, groups=32, bias_lr=2.0,
                                         weight_init=Normal(loc=0., scale=0.01), bias_init=Constant(0.0),
                                         act='relu', use_dcn=use_dcn, name='fcos_head_cls_tower_conv_{}'.format(lvl))
             self.cls_convs.append(cls_conv_layer)
@@ -100,7 +98,7 @@ class FCOSHead(paddle.nn.Layer):
             if self.coord_conv:
                 in_ch = self.in_channel + 2 if lvl == 0 else self.in_channel
             in_ch = in_ch * 4 if self.use_spp and lvl == 1 else in_ch   # spp层暂定放在第一个卷积层之后
-            reg_conv_layer = Conv2dUnit(in_ch, self.in_channel, 3, stride=1, bias_attr=True, bn=bn, gn=gn, af=af, groups=32, bias_lr=2.0,
+            reg_conv_layer = Conv2dUnit(in_ch, self.in_channel, 3, stride=1, bias_attr=True, norm_type=norm_type, groups=32, bias_lr=2.0,
                                         weight_init=Normal(loc=0., scale=0.01), bias_init=Constant(0.0),
                                         act='relu', use_dcn=use_dcn, name='fcos_head_reg_tower_conv_{}'.format(lvl))
             self.reg_convs.append(reg_conv_layer)
