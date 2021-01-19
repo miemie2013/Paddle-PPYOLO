@@ -116,10 +116,8 @@ class FCOS_RT_DLA34_FPN_4x_Config(object):
             channels=[16, 32, 64, 128, 256, 512],
             block_name='BasicBlock',
             feature_maps=[3, 4, 5],
-            freeze_at=2,
-            fix_bn_mean_var_at=0,
-            freeze_norm=False,
-            norm_decay=0.,
+            freeze_at=5,
+            fix_bn_mean_var_at=5,
         )
         self.fpn_type = 'FPN'
         self.fpn = dict(

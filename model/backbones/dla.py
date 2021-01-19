@@ -20,9 +20,8 @@ from model.custom_layers import *
 class BasicBlock(paddle.nn.Layer):
     def __init__(self, norm_type, inplanes, planes, stride=1, name=''):
         super(BasicBlock, self).__init__()
-        bn, gn, af = get_norm(norm_type)
-        self.conv1 = Conv2dUnit(inplanes, planes, 3, stride=stride, bias_attr=False, bn=bn, gn=gn, af=af, act='relu', name=name+'.conv1')
-        self.conv2 = Conv2dUnit(planes, planes, 3, stride=1, bias_attr=False, bn=bn, gn=gn, af=af, act=None, name=name+'.conv2')
+        self.conv1 = Conv2dUnit(inplanes, planes, 3, stride=stride, bias_attr=False, norm_type=norm_type, act='relu', name=name+'.conv1')
+        self.conv2 = Conv2dUnit(planes, planes, 3, stride=1, bias_attr=False, norm_type=norm_type, act=None, name=name+'.conv2')
         self.relu = nn.ReLU()
         self.stride = stride
 
@@ -39,13 +38,16 @@ class BasicBlock(paddle.nn.Layer):
         self.conv1.freeze()
         self.conv2.freeze()
 
+    def fix_bn(self):
+        self.conv1.fix_bn()
+        self.conv2.fix_bn()
+
 
 
 class Root(paddle.nn.Layer):
     def __init__(self, norm_type, in_channels, out_channels, kernel_size, residual, name=''):
         super(Root, self).__init__()
-        bn, gn, af = get_norm(norm_type)
-        self.conv = Conv2dUnit(in_channels, out_channels, kernel_size, stride=1, bias_attr=False, bn=bn, gn=gn, af=af, act=None, name=name+'.conv')
+        self.conv = Conv2dUnit(in_channels, out_channels, kernel_size, stride=1, bias_attr=False, norm_type=norm_type, act=None, name=name+'.conv')
         self.relu = nn.ReLU()
         self.residual = residual
 
@@ -60,6 +62,9 @@ class Root(paddle.nn.Layer):
 
     def freeze(self):
         self.conv.freeze()
+
+    def fix_bn(self):
+        self.conv.fix_bn()
 
 
 class Tree(paddle.nn.Layer):
@@ -90,8 +95,7 @@ class Tree(paddle.nn.Layer):
         if stride > 1:
             self.downsample = nn.MaxPool2D(kernel_size=stride, stride=stride, padding=0)
         if in_channels != out_channels:
-            bn, gn, af = get_norm(norm_type)
-            self.project = Conv2dUnit(in_channels, out_channels, 1, stride=1, bias_attr=False, bn=bn, gn=gn, af=af, act=None, name=name+'.project')
+            self.project = Conv2dUnit(in_channels, out_channels, 1, stride=1, bias_attr=False, norm_type=norm_type, act=None, name=name+'.project')
 
     def forward(self, x, residual=None, children=None):
         if self.training and residual is not None:   # training是父类nn.Layer中的属性。
@@ -120,16 +124,28 @@ class Tree(paddle.nn.Layer):
         else:
             self.tree2.freeze()
 
+    def fix_bn(self):
+        if self.project:
+            self.project.fix_bn()
+        self.tree1.fix_bn()
+        if self.levels == 1:
+            self.tree2.fix_bn()
+            self.root.fix_bn()
+        else:
+            self.tree2.fix_bn()
+
 
 
 class DLA(paddle.nn.Layer):
-    def __init__(self, norm_type, levels, channels, block_name='BasicBlock', residual_root=False, feature_maps=[3, 4, 5], freeze_at=0):
+    def __init__(self, norm_type, levels, channels, block_name='BasicBlock', residual_root=False, feature_maps=[3, 4, 5], freeze_at=0, fix_bn_mean_var_at=0):
         super(DLA, self).__init__()
         self.norm_type = norm_type
         self.channels = channels
         self.feature_maps = feature_maps
         assert freeze_at in [0, 1, 2, 3, 4, 5, 6, 7]
+        assert fix_bn_mean_var_at in [0, 1, 2, 3, 4, 5, 6, 7]
         self.freeze_at = freeze_at
+        self.fix_bn_mean_var_at = fix_bn_mean_var_at
         block = None
         if block_name == 'BasicBlock':
             block = BasicBlock
@@ -138,8 +154,7 @@ class DLA(paddle.nn.Layer):
         self._out_feature_channels = {k: channels[i] for i, k in enumerate(self._out_features)}   # 每个特征图的输出通道数
         self._out_feature_strides = {k: 2 ** i for i, k in enumerate(self._out_features)}   # 每个特征图的下采样倍率
 
-        bn, gn, af = get_norm(norm_type)
-        self.base_layer = Conv2dUnit(3, channels[0], 7, stride=1, bias_attr=False, bn=bn, gn=gn, af=af, act='relu', name='dla.base_layer')
+        self.base_layer = Conv2dUnit(3, channels[0], 7, stride=1, bias_attr=False, norm_type=norm_type, act='relu', name='dla.base_layer')
         self.level0 = self._make_conv_level(channels[0], channels[0], levels[0], name='dla.level0')
         self.level1 = self._make_conv_level(channels[0], channels[1], levels[1], stride=2, name='dla.level1')
         self.level2 = Tree(norm_type, levels[2], block, channels[1], channels[2], 2,
@@ -160,8 +175,8 @@ class DLA(paddle.nn.Layer):
     def _make_conv_level(self, inplanes, planes, convs, stride=1, name=''):
         modules = []
         for i in range(convs):
-            bn, gn, af = get_norm(self.norm_type)
-            modules.append(Conv2dUnit(inplanes, planes, 3, stride=stride if i == 0 else 1, bias_attr=False, bn=bn, gn=gn, af=af, act='relu', name=name+'.conv%d'%i))
+            norm_type = self.norm_type
+            modules.append(Conv2dUnit(inplanes, planes, 3, stride=stride if i == 0 else 1, bias_attr=False, norm_type=norm_type, act='relu', name=name+'.conv%d'%i))
             inplanes = planes
         return nn.Sequential(*modules)
 
@@ -195,6 +210,27 @@ class DLA(paddle.nn.Layer):
             self.level4.freeze()
         if freeze_at >= 7:
             self.level5.freeze()
+
+    def fix_bn(self):
+        fix_bn_mean_var_at = self.fix_bn_mean_var_at
+        if fix_bn_mean_var_at >= 1:
+            self.base_layer.fix_bn()
+        if fix_bn_mean_var_at >= 2:
+            n = len(self.level0)
+            for i in range(n):
+                self.level0[i].fix_bn()
+        if fix_bn_mean_var_at >= 3:
+            n = len(self.level1)
+            for i in range(n):
+                self.level1[i].fix_bn()
+        if fix_bn_mean_var_at >= 4:
+            self.level2.fix_bn()
+        if fix_bn_mean_var_at >= 5:
+            self.level3.fix_bn()
+        if fix_bn_mean_var_at >= 6:
+            self.level4.fix_bn()
+        if fix_bn_mean_var_at >= 7:
+            self.level5.fix_bn()
 
 
 
