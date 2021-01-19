@@ -91,38 +91,38 @@ parser.add_argument('-c', '--config', type=int, default=0,
 
 训练
 cd ~/w*
-python train.py --config=0
+python train_fcos.py --config=0
 
 cd ~/w*
-python train.py --config=1
+python train_fcos.py --config=1
 
 cd ~/w*
-python train.py --config=2
+python train_fcos.py --config=2
 
 cd ~/w*
-python train.py --config=3
+python train_fcos.py --config=3
 
 cd ~/w*
-python train.py --config=4
+python train_fcos.py --config=4
 
 
 
 
 预测
 cd ~/w*
-python demo.py --config=0
+python demo_fcos.py --config=0
 
 cd ~/w*
-python demo.py --config=1
+python demo_fcos.py --config=1
 
 cd ~/w*
-python demo.py --config=2
+python demo_fcos.py --config=2
 
 cd ~/w*
-python demo.py --config=3
+python demo_fcos.py --config=3
 
 cd ~/w*
-python demo.py --config=4
+python demo_fcos.py --config=4
 
 
 
@@ -137,19 +137,19 @@ zip -r out.zip images/res/*.jpg
 
 验证
 cd ~/w*
-python eval.py --config=0
+python eval_fcos.py --config=0
 
 cd ~/w*
-python eval.py --config=1
+python eval_fcos.py --config=1
 
 cd ~/w*
-python eval.py --config=2
+python eval_fcos.py --config=2
 
 cd ~/w*
-python eval.py --config=3
+python eval_fcos.py --config=3
 
 cd ~/w*
-python eval.py --config=4
+python eval_fcos.py --config=4
 
 
 

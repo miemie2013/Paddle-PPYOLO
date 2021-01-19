@@ -43,17 +43,21 @@ class FCOS_RT_R50_FPN_4x_Config(object):
 
         # ========= 一些设置 =========
         self.train_cfg = dict(
-            batch_size=2,
+            batch_size=16,
+            num_workers=5,   # 读数据的进程数
             num_threads=5,   # 读数据的线程数
             max_batch=2,     # 最大读多少个批
             model_path='dygraph_fcos_rt_r50_fpn_4x.pdparams',
             # model_path='dygraph_r50vd_ssld.pdparams',
             # model_path='./weights/1000.pdparams',
+            update_iter=1,    # 每隔几步更新一次参数
+            log_iter=20,      # 每隔几步打印一次
             save_iter=1000,   # 每隔几步保存一次模型
             eval_iter=20000,   # 每隔几步计算一次eval集的mAP
             max_iters=360000,   # 训练多少步
             mixup_epoch=10,     # 前几轮进行mixup
-            cutmix_epoch=-1,    # 前几轮进行cutmix
+            cutmix_epoch=10,    # 前几轮进行cutmix
+            mosaic_epoch=1000,  # 前几轮进行mosaic
         )
         self.learningRate = dict(
             base_lr=0.01,
@@ -86,7 +90,7 @@ class FCOS_RT_R50_FPN_4x_Config(object):
             max_size=736,
             draw_image=False,    # 是否画出验证集图片
             draw_thresh=0.15,    # 如果draw_image==True，那么只画出分数超过draw_thresh的物体的预测框。
-            eval_batch_size=8,   # 验证时的批大小。
+            eval_batch_size=1,   # 验证时的批大小。
         )
 
         # 测试。用于demo.py
@@ -94,7 +98,6 @@ class FCOS_RT_R50_FPN_4x_Config(object):
             model_path='dygraph_fcos_rt_r50_fpn_4x.pdparams',
             # model_path='./weights/1000.pdparams',
             target_size=512,
-            # target_size=320,
             max_size=736,
             draw_image=True,
             draw_thresh=0.15,   # 如果draw_image==True，那么只画出分数超过draw_thresh的物体的预测框。
@@ -105,6 +108,7 @@ class FCOS_RT_R50_FPN_4x_Config(object):
         # self.use_ema = True
         self.use_ema = False
         self.ema_decay = 0.9998
+        self.ema_iter = 1
         self.backbone_type = 'Resnet50Vb'
         self.backbone = dict(
             norm_type='bn',
@@ -112,6 +116,7 @@ class FCOS_RT_R50_FPN_4x_Config(object):
             dcn_v2_stages=[],
             downsample_in3x3=False,   # 注意这个细节，是在1x1卷积层下采样的。即Resnet50Va。
             freeze_at=2,
+            fix_bn_mean_var_at=0,
             freeze_norm=False,
             norm_decay=0.,
         )
@@ -142,7 +147,7 @@ class FCOS_RT_R50_FPN_4x_Config(object):
         self.fcos_loss = dict(
             loss_alpha=0.25,
             loss_gamma=2.0,
-            iou_loss_type='ciou',  # linear_iou/giou/iou/ciou。 使用ciou迁移学习2000步发现对voc2012有积极作用（比默认的giou好一点）。
+            iou_loss_type='giou',  # linear_iou/giou/iou/ciou
             reg_weights=1.0,
         )
         # self.nms_cfg = dict(
@@ -165,30 +170,13 @@ class FCOS_RT_R50_FPN_4x_Config(object):
 
         # ============= 预处理相关 =============
         self.context = {'fields': ['image', 'im_info', 'fcos_target']}
-        # DecodeImage。mixup和cutmix只能同时使用一个。
+        # DecodeImage
         self.decodeImage = dict(
-            to_rgb=True,
-            with_mixup=True,
+            to_rgb=False,   # AdelaiDet里使用了BGR格式
+            with_mixup=False,
             with_cutmix=False,
+            with_mosaic=False,
         )
-        # MixupImage。新增的数据增强。
-        self.mixupImage = dict(
-            alpha=1.5,
-            beta=1.5,
-        )
-        # CutmixImage。新增的数据增强。
-        self.cutmixImage = dict(
-            alpha=1.5,
-            beta=1.5,
-        )
-        # ColorDistort。新增的数据增强。
-        self.colorDistort = dict()
-        # RandomExpand。新增的数据增强。
-        self.randomExpand = dict(
-            fill_value=[123.675, 116.28, 103.53],
-        )
-        # RandomCrop。新增的数据增强。
-        self.randomCrop = dict()
         # RandomFlipImage
         self.randomFlipImage = dict(
             prob=0.5,
@@ -197,19 +185,8 @@ class FCOS_RT_R50_FPN_4x_Config(object):
         self.normalizeImage = dict(
             is_channel_first=False,
             is_scale=False,
-            mean=[123.675, 116.28, 103.53],
+            mean=[103.53, 116.28, 123.675],   # BGR的均值
             std=[1.0, 1.0, 1.0],
-        )
-        # GridMaskOp。新增的数据增强。
-        self.gridMaskOp = dict(
-            use_h=True,
-            use_w=True,
-            rotate=1,
-            offset=False,
-            ratio=0.5,
-            mode=1,
-            prob=0.7,
-            upper_iter=360000,
         )
         # ResizeImage
         # 图片短的那一边缩放到选中的target_size，长的那一边等比例缩放；如果这时候长的那一边大于max_size，
@@ -244,14 +221,8 @@ class FCOS_RT_R50_FPN_4x_Config(object):
         # 预处理顺序。增加一些数据增强时这里也要加上，否则train.py中相当于没加！
         self.sample_transforms_seq = []
         self.sample_transforms_seq.append('decodeImage')
-        self.sample_transforms_seq.append('mixupImage')
-        # self.sample_transforms_seq.append('cutmixImage')
-        self.sample_transforms_seq.append('colorDistort')   # 迁移学习2000步发现对voc2012有积极作用。
-        # self.sample_transforms_seq.append('randomExpand')   # 迁移学习2000步发现可能对voc2012有负面作用，需要训练饱和才能确定。
-        # self.sample_transforms_seq.append('randomCrop')     # 迁移学习2000步发现可能对voc2012有负面作用，需要训练饱和才能确定。
         self.sample_transforms_seq.append('randomFlipImage')
         self.sample_transforms_seq.append('normalizeImage')
-        self.sample_transforms_seq.append('gridMaskOp')   # 迁移学习2000步发现对voc2012有积极作用。
         self.sample_transforms_seq.append('resizeImage')
         self.sample_transforms_seq.append('permute')
         self.batch_transforms_seq = []
