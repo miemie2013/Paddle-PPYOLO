@@ -411,7 +411,8 @@ if __name__ == '__main__':
     #     data = train_dataset[i]
     #     print(data)
     train_loader = paddle.io.DataLoader(train_dataset, batch_size=batch_size,
-                                        num_workers=cfg.train_cfg['num_workers'], use_shared_memory=True,
+                                        num_workers=cfg.train_cfg['num_workers'],
+                                        use_shared_memory=False,   # use_shared_memory=True且num_workers>0时会报错。
                                         shuffle=False, drop_last=True)
 
     # 输出几个特征图
