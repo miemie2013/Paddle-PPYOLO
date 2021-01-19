@@ -43,17 +43,21 @@ class FCOS_RT_DLA34_FPN_4x_Config(object):
 
         # ========= 一些设置 =========
         self.train_cfg = dict(
-            batch_size=2,
+            batch_size=16,
+            num_workers=5,   # 读数据的进程数
             num_threads=5,   # 读数据的线程数
             max_batch=2,     # 最大读多少个批
             model_path='dygraph_fcos_rt_dla34_fpn_4x.pdparams',
             # model_path='dygraph_r50vd_ssld.pdparams',
             # model_path='./weights/1000.pdparams',
+            update_iter=1,    # 每隔几步更新一次参数
+            log_iter=20,      # 每隔几步打印一次
             save_iter=1000,   # 每隔几步保存一次模型
             eval_iter=20000,   # 每隔几步计算一次eval集的mAP
             max_iters=360000,   # 训练多少步
-            mixup_epoch=-1,     # 前几轮进行mixup
-            cutmix_epoch=-1,    # 前几轮进行cutmix
+            mixup_epoch=10,     # 前几轮进行mixup
+            cutmix_epoch=10,    # 前几轮进行cutmix
+            mosaic_epoch=1000,  # 前几轮进行mosaic
         )
         self.learningRate = dict(
             base_lr=0.01,
@@ -86,7 +90,7 @@ class FCOS_RT_DLA34_FPN_4x_Config(object):
             max_size=736,
             draw_image=False,    # 是否画出验证集图片
             draw_thresh=0.15,    # 如果draw_image==True，那么只画出分数超过draw_thresh的物体的预测框。
-            eval_batch_size=8,   # 验证时的批大小。
+            eval_batch_size=1,   # 验证时的批大小。
         )
 
         # 测试。用于demo.py
@@ -94,7 +98,6 @@ class FCOS_RT_DLA34_FPN_4x_Config(object):
             model_path='dygraph_fcos_rt_dla34_fpn_4x.pdparams',
             # model_path='./weights/1000.pdparams',
             target_size=512,
-            # target_size=320,
             max_size=736,
             draw_image=True,
             draw_thresh=0.15,   # 如果draw_image==True，那么只画出分数超过draw_thresh的物体的预测框。
@@ -105,6 +108,7 @@ class FCOS_RT_DLA34_FPN_4x_Config(object):
         # self.use_ema = True
         self.use_ema = False
         self.ema_decay = 0.9998
+        self.ema_iter = 1
         self.backbone_type = 'DLA'
         self.backbone = dict(
             norm_type='bn',
@@ -112,7 +116,10 @@ class FCOS_RT_DLA34_FPN_4x_Config(object):
             channels=[16, 32, 64, 128, 256, 512],
             block_name='BasicBlock',
             feature_maps=[3, 4, 5],
-            freeze_at=7,
+            freeze_at=2,
+            fix_bn_mean_var_at=0,
+            freeze_norm=False,
+            norm_decay=0.,
         )
         self.fpn_type = 'FPN'
         self.fpn = dict(
@@ -169,6 +176,7 @@ class FCOS_RT_DLA34_FPN_4x_Config(object):
             to_rgb=True,
             with_mixup=False,
             with_cutmix=False,
+            with_mosaic=False,
         )
         # RandomFlipImage
         self.randomFlipImage = dict(

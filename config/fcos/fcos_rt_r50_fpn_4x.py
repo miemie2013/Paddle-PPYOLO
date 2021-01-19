@@ -172,7 +172,7 @@ class FCOS_RT_R50_FPN_4x_Config(object):
         self.context = {'fields': ['image', 'im_info', 'fcos_target']}
         # DecodeImage
         self.decodeImage = dict(
-            to_rgb=False,   # AdelaiDet里使用了BGR格式
+            to_rgb=True,
             with_mixup=False,
             with_cutmix=False,
             with_mosaic=False,
@@ -185,7 +185,7 @@ class FCOS_RT_R50_FPN_4x_Config(object):
         self.normalizeImage = dict(
             is_channel_first=False,
             is_scale=False,
-            mean=[103.53, 116.28, 123.675],   # BGR的均值
+            mean=[123.675, 116.28, 103.53],
             std=[1.0, 1.0, 1.0],
         )
         # ResizeImage
