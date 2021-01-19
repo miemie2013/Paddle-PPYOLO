@@ -13,16 +13,14 @@ import cv2
 import os
 import time
 import threading
-from collections import OrderedDict
 import argparse
 import textwrap
 import paddle
 
 from config import *
-from static_model.decode_np import Decode
-from static_model.ppyolo import *
-import static_model.get_model as M
-from tools.argparser import ArgParser
+from model.decode_yolo import *
+from model.ppyolo import *
+from tools.argparser import *
 from tools.cocotools import get_classes
 
 import logging
@@ -54,15 +52,16 @@ def save_img(filename, image):
     cv2.imwrite('images/res/' + filename, image)
 
 if __name__ == '__main__':
-    paddle.enable_static()
-    parser = ArgParser()
+    parser = YOLOArgParser()
     use_gpu = parser.get_use_gpu()
     cfg = parser.get_cfg()
     print(paddle.__version__)
+    paddle.disable_static()   # 开启动态图
+    gpu_id = int(os.environ.get('FLAGS_selected_gpus', 0))
+    place = paddle.CUDAPlace(gpu_id) if use_gpu else paddle.CPUPlace()
 
     # 读取的模型
     model_path = cfg.test_cfg['model_path']
-    model_path = 'static_ppyolo_2x'
 
     # 是否给图片画框。
     draw_image = cfg.test_cfg['draw_image']
@@ -81,31 +80,18 @@ if __name__ == '__main__':
 
 
     # 创建模型
-    startup_prog = fluid.Program()
-    infer_prog = fluid.Program()
-    with fluid.program_guard(infer_prog, startup_prog):
-        with fluid.unique_name.guard():
-            # 创建模型
-            Backbone = M.select_backbone(cfg.backbone_type)
-            backbone = Backbone(**cfg.backbone)
-            Head = M.select_head(cfg.head_type)
-            head = Head(yolo_loss=None, nms_cfg=cfg.nms_cfg, **cfg.head)
-            model = PPYOLO(backbone, head)
+    Backbone = select_backbone(cfg.backbone_type)
+    backbone = Backbone(**cfg.backbone)
+    Head = select_head(cfg.head_type)
+    head = Head(yolo_loss=None, nms_cfg=cfg.nms_cfg, **cfg.head)
+    model = PPYOLO(backbone, head)
 
-            image = L.data(name='image', shape=[-1, 3, -1, -1], append_batch_size=False, dtype='float32')
-            im_size = L.data(name='im_size', shape=[-1, 2], append_batch_size=False, dtype='int32')
-            feed_vars = [('image', image), ('im_size', im_size)]
-            feed_vars = OrderedDict(feed_vars)
-            pred = model(image, im_size)
-            test_fetches = [pred]
-    infer_prog = infer_prog.clone(for_test=True)
-    gpu_id = int(os.environ.get('FLAGS_selected_gpus', 0))
-    place = fluid.CUDAPlace(gpu_id) if use_gpu else fluid.CPUPlace()
-    exe = fluid.Executor(place)
-    exe.run(startup_prog)
+    param_state_dict = paddle.load(model_path)
+    model.set_state_dict(param_state_dict)
+    model.eval()  # 必须调用model.eval()来设置dropout和batch normalization layers在运行推理前，切换到评估模式。
+    head.set_dropblock(is_test=True)
 
-    fluid.load(infer_prog, model_path, executor=exe)
-    _decode = Decode(exe, infer_prog, test_fetches, class_names, cfg, for_test=True)
+    _decode = Decode(model, class_names, place, cfg, for_test=True)
 
     if not os.path.exists('images/res/'): os.mkdir('images/res/')
     path_dir = os.listdir('images/test')

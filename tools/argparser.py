@@ -12,7 +12,7 @@ import textwrap
 from config import *
 
 
-class ArgParser(object):
+class YOLOArgParser(object):
     def __init__(self):
         parser = argparse.ArgumentParser(description='Script', formatter_class=argparse.RawTextHelpFormatter)
         parser.add_argument('--use_gpu', type=bool, default=True, help='whether to use gpu. True or False')

@@ -7,10 +7,10 @@
 #   Description : paddle2.0_ppyolo
 #
 # ================================================================
-from model.losses import *
+from model.yolov3_loss import *
 from model.my_loss import *
 from model.iou_losses import *
-from model.head import *
+from model.yolov3_head import *
 from model.yolov4_head import *
 from model.resnet_vb import *
 from model.resnet_vd import *

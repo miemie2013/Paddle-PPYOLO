@@ -20,7 +20,7 @@ import numpy as np
 from tools.transform import *
 
 
-class Decode(object):
+class Decode_YOLO(object):
     def __init__(self, _yolo, all_classes, place, cfg, for_test=True):
         self.all_classes = all_classes
         self.num_classes = len(self.all_classes)

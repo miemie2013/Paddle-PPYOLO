@@ -16,9 +16,9 @@ import paddle
 import json
 
 from tools.cocotools import eval
-from model.decode_np import Decode
+from model.decode_yolo import Decode_YOLO
 from model.ppyolo import PPYOLO
-from tools.argparser import ArgParser
+from tools.yoloargparser import YOLOArgParser
 from tools.cocotools import get_classes
 
 import logging
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 if __name__ == '__main__':
-    parser = ArgParser()
+    parser = YOLOArgParser()
     use_gpu = parser.get_use_gpu()
     cfg = parser.get_cfg()
     print(paddle.__version__)
@@ -54,19 +54,14 @@ if __name__ == '__main__':
     print('use_gpu: %s' % str(use_gpu))
     print()
 
-    # 验证集图片的相对路径
-    eval_pre_path = cfg.val_pre_path
-    anno_file = cfg.val_path
-    from pycocotools.coco import COCO
-    val_dataset = COCO(anno_file)
-    val_img_ids = val_dataset.getImgIds()
-    images = []   # 只跑有gt的图片，跟随PaddleDetection
-    for img_id in val_img_ids:
-        ins_anno_ids = val_dataset.getAnnIds(imgIds=img_id, iscrowd=False)   # 读取这张图片所有标注anno的id
-        if len(ins_anno_ids) == 0:
-            continue
-        img_anno = val_dataset.loadImgs(img_id)[0]
-        images.append(img_anno)
+    # test集图片的相对路径
+    test_pre_path = cfg.test_pre_path
+    anno_file = cfg.test_path
+    with open(anno_file, 'r', encoding='utf-8') as f2:
+        for line in f2:
+            line = line.strip()
+            dataset = json.loads(line)
+            images = dataset['images']
 
     # 种类id
     _catid2clsid = {}
@@ -103,6 +98,6 @@ if __name__ == '__main__':
     model.eval()  # 必须调用model.eval()来设置dropout和batch normalization layers在运行推理前，切换到评估模式。
     head.set_dropblock(is_test=True)
 
-    _decode = Decode(model, class_names, place, cfg, for_test=False)
-    box_ap = eval(_decode, images, eval_pre_path, anno_file, eval_batch_size, _clsid2catid, draw_image, draw_thresh)
+    _decode = Decode_YOLO(model, class_names, place, cfg, for_test=False)
+    eval(_decode, images, test_pre_path, anno_file, eval_batch_size, _clsid2catid, draw_image, draw_thresh, type='test_dev')
 

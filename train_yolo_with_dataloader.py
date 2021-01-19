@@ -20,10 +20,10 @@ import json
 from config import *
 from model.EMA import ExponentialMovingAverage
 
-from model.ppyolo import PPYOLO
-from tools.argparser import ArgParser
+from model.ppyolo import *
+from tools.argparser import *
 from tools.cocotools import get_classes, catid2clsid, clsid2catid
-from model.decode_np import Decode
+from model.decode_yolo import *
 from tools.cocotools import eval
 from tools.data_process import data_clean, get_samples
 from tools.transform import *
@@ -36,114 +36,130 @@ logging.basicConfig(level=logging.INFO, format=FORMAT)
 logger = logging.getLogger(__name__)
 
 
-def multi_thread_op(i, num_threads, batch_size, samples, context, with_mixup, sample_transforms, batch_transforms,
-                    shape, images, gt_bbox, gt_score, gt_class, target0, target1, target2, n_layers):
-    for k in range(i, batch_size, num_threads):
-        for sample_transform in sample_transforms:
-            if isinstance(sample_transform, MixupImage):
-                if with_mixup:
-                    samples[k] = sample_transform(samples[k], context)
-            else:
-                samples[k] = sample_transform(samples[k], context)
+class COCOTrainDataset(paddle.io.Dataset):
+    def __init__(self, records, init_iter_id, cfg, sample_transforms, batch_transforms):
+        self.records = records
+        self.init_iter_id = init_iter_id
+        self.cfg = cfg
+        self.sample_transforms = sample_transforms
+        self.batch_transforms = batch_transforms
+        self.num_record = len(records)
+        indexes = [i for i in range(self.num_record)]
 
-        for batch_transform in batch_transforms:
-            if isinstance(batch_transform, RandomShapeSingle):
-                samples[k] = batch_transform(shape, samples[k], context)
-            else:
-                samples[k] = batch_transform(samples[k], context)
+        max_iters = cfg.train_cfg['max_iters']
+        batch_size = cfg.train_cfg['batch_size']
+        self.with_mixup = cfg.decodeImage['with_mixup']
+        self.with_cutmix = cfg.decodeImage['with_cutmix']
+        self.with_mosaic = cfg.decodeImage['with_mosaic']
+        mixup_epoch = cfg.train_cfg['mixup_epoch']
+        cutmix_epoch = cfg.train_cfg['cutmix_epoch']
+        mosaic_epoch = cfg.train_cfg['mosaic_epoch']
+        self.context = cfg.context
+        self.batch_size = batch_size
 
-        # 整理成ndarray
-        images[k] = np.expand_dims(samples[k]['image'].astype(np.float32), 0)
-        gt_bbox[k] = np.expand_dims(samples[k]['gt_bbox'].astype(np.float32), 0)
-        gt_score[k] = np.expand_dims(samples[k]['gt_score'].astype(np.float32), 0)
-        gt_class[k] = np.expand_dims(samples[k]['gt_class'].astype(np.int32), 0)
-        target0[k] = np.expand_dims(samples[k]['target0'].astype(np.float32), 0)
-        target1[k] = np.expand_dims(samples[k]['target1'].astype(np.float32), 0)
-        if n_layers > 2:
-            target2[k] = np.expand_dims(samples[k]['target2'].astype(np.float32), 0)
+        # 一轮的步数。丢弃最后几个样本。
+        train_steps = self.num_record // batch_size
+        self.mixup_steps = mixup_epoch * train_steps
+        self.cutmix_steps = cutmix_epoch * train_steps
+        self.mosaic_steps = mosaic_epoch * train_steps
 
+        # 一轮的样本数。丢弃最后几个样本。
+        train_samples = train_steps * batch_size
 
-def read_train_data(cfg,
-                    train_indexes,
-                    train_steps,
-                    train_records,
-                    batch_size,
-                    _iter_id,
-                    train_dic,
-                    use_gpu,
-                    n_layers,
-                    context, with_mixup, with_cutmix, with_mosaic, mixup_steps, cutmix_steps, mosaic_steps, sample_transforms, batch_transforms):
-    iter_id = _iter_id
-    num_threads = cfg.train_cfg['num_threads']
-    while True:   # 无限个epoch
-        # 每个epoch之前洗乱
-        np.random.shuffle(train_indexes)
-        for step in range(train_steps):
-            iter_id += 1
+        # 训练样本
+        self.indexes = []
+        while len(self.indexes) < max_iters * batch_size:
+            indexes2 = copy.deepcopy(indexes)
+            # 每个epoch之前洗乱
+            np.random.shuffle(indexes2)
+            indexes2 = indexes2[:train_samples]
+            self.indexes += indexes2
+        self.indexes = self.indexes[:max_iters * batch_size]
 
-            key_list = list(train_dic.keys())
-            key_len = len(key_list)
-            while key_len >= cfg.train_cfg['max_batch']:
-                time.sleep(0.01)
-                key_list = list(train_dic.keys())
-                key_len = len(key_list)
-
-            # ==================== train ====================
-            sizes = cfg.randomShape['sizes']
+        # 多尺度训练
+        sizes = cfg.randomShape['sizes']
+        self.shapes = []
+        while len(self.shapes) < max_iters:
             shape = np.random.choice(sizes)
-            images = [None] * batch_size
-            gt_bbox = [None] * batch_size
-            gt_score = [None] * batch_size
-            gt_class = [None] * batch_size
-            target0 = [None] * batch_size
-            target1 = [None] * batch_size
-            target2 = [None] * batch_size
+            self.shapes.append(shape)
 
-            samples = get_samples(train_records, train_indexes, step, batch_size, iter_id,
-                                  with_mixup, with_cutmix, with_mosaic, mixup_steps, cutmix_steps, mosaic_steps)
-            # sample_transforms用多线程
-            threads = []
-            for i in range(num_threads):
-                t = threading.Thread(target=multi_thread_op, args=(i, num_threads, batch_size, samples, context, with_mixup, sample_transforms, batch_transforms,
-                                                                   shape, images, gt_bbox, gt_score, gt_class, target0, target1, target2, n_layers))
-                threads.append(t)
-                t.start()
-            # 等待所有线程任务结束。
-            for t in threads:
-                t.join()
+        # 输出几个特征图
+        self.n_layers = len(cfg.head['anchor_masks'])
 
-            images = np.concatenate(images, 0)
-            gt_bbox = np.concatenate(gt_bbox, 0)
-            gt_score = np.concatenate(gt_score, 0)
-            gt_class = np.concatenate(gt_class, 0)
-            target0 = np.concatenate(target0, 0)
-            target1 = np.concatenate(target1, 0)
-            if n_layers > 2:
-                target2 = np.concatenate(target2, 0)
+    def __getitem__(self, idx):
+        iter_id = idx // self.batch_size
+        if iter_id < self.init_iter_id:   # 恢复训练时跳过。
+            return np.zeros((1, ), np.float32)
 
-            images = paddle.to_tensor(images, place=place)
-            gt_bbox = paddle.to_tensor(gt_bbox, place=place)
-            gt_score = paddle.to_tensor(gt_score, place=place)
-            gt_class = paddle.to_tensor(gt_class, place=place)
-            target0 = paddle.to_tensor(target0, place=place)
-            target1 = paddle.to_tensor(target1, place=place)
-            if n_layers > 2:
-                target2 = paddle.to_tensor(target2, place=place)
+        img_idx = self.indexes[idx]
+        shape = self.shapes[iter_id]
+        sample = copy.deepcopy(self.records[img_idx])
+        sample["curr_iter"] = iter_id
 
-            dic = {}
-            dic['images'] = images
-            dic['gt_bbox'] = gt_bbox
-            dic['gt_score'] = gt_score
-            dic['gt_class'] = gt_class
-            dic['target0'] = target0
-            dic['target1'] = target1
-            if n_layers > 2:
-                dic['target2'] = target2
-            train_dic['%.8d'%iter_id] = dic
+        # 为mixup数据增强做准备
+        if self.with_mixup and iter_id <= self.mixup_steps:
+            num = len(self.records)
+            mix_idx = np.random.randint(0, num)
+            while mix_idx == img_idx:   # 为了不选到自己
+                mix_idx = np.random.randint(0, num)
+            sample['mixup'] = copy.deepcopy(self.records[mix_idx])
+            sample['mixup']["curr_iter"] = iter_id
 
-            # ==================== exit ====================
-            if iter_id == cfg.train_cfg['max_iters']:
-                return 0
+        # 为cutmix数据增强做准备
+        if self.with_cutmix and iter_id <= self.cutmix_steps:
+            num = len(self.records)
+            mix_idx = np.random.randint(0, num)
+            while mix_idx == img_idx:   # 为了不选到自己
+                mix_idx = np.random.randint(0, num)
+            sample['cutmix'] = copy.deepcopy(self.records[mix_idx])
+            sample['cutmix']["curr_iter"] = iter_id
+
+        # 为mosaic数据增强做准备
+        if self.with_mosaic and iter_id <= self.mosaic_steps:
+            num = len(self.records)
+            mix_idx = np.random.randint(0, num)
+            while mix_idx == img_idx:   # 为了不选到自己
+                mix_idx = np.random.randint(0, num)
+            sample['mosaic1'] = copy.deepcopy(self.records[mix_idx])
+            sample['mosaic1']["curr_iter"] = iter_id
+
+            mix_idx2 = np.random.randint(0, num)
+            while mix_idx2 in [img_idx, mix_idx]:   # 为了不重复
+                mix_idx2 = np.random.randint(0, num)
+            sample['mosaic2'] = copy.deepcopy(self.records[mix_idx2])
+            sample['mosaic2']["curr_iter"] = iter_id
+
+            mix_idx3 = np.random.randint(0, num)
+            while mix_idx3 in [img_idx, mix_idx, mix_idx2]:   # 为了不重复
+                mix_idx3 = np.random.randint(0, num)
+            sample['mosaic3'] = copy.deepcopy(self.records[mix_idx3])
+            sample['mosaic3']["curr_iter"] = iter_id
+
+        # batch_transforms
+        for sample_transform in self.sample_transforms:
+            sample = sample_transform(sample, self.context)
+
+        # batch_transforms
+        for batch_transform in self.batch_transforms:
+            if isinstance(batch_transform, RandomShapeSingle):
+                sample = batch_transform(shape, sample, self.context)
+            else:
+                sample = batch_transform(sample, self.context)
+
+        # 取出感兴趣的项
+        image = sample['image'].astype(np.float32)
+        gt_bbox = sample['gt_bbox'].astype(np.float32)
+        gt_score = sample['gt_score'].astype(np.float32)
+        gt_class = sample['gt_class'].astype(np.int32)
+        target0 = sample['target0'].astype(np.float32)
+        target1 = sample['target1'].astype(np.float32)
+        if self.n_layers > 2:
+            target2 = sample['target2'].astype(np.float32)
+            return image, gt_bbox, gt_score, gt_class, target0, target1, target2
+        return image, gt_bbox, gt_score, gt_class, target0, target1
+
+    def __len__(self):
+        return len(self.indexes)
 
 
 def load_weights(model, model_path):
@@ -390,6 +406,15 @@ if __name__ == '__main__':
     for trf in batch_transforms:
         print('%s' % str(type(trf)))
 
+    train_dataset = COCOTrainDataset(train_records, iter_id, cfg, sample_transforms, batch_transforms)
+    # for i in range(len(train_dataset)):
+    #     data = train_dataset[i]
+    #     print(data)
+    train_loader = paddle.io.DataLoader(train_dataset, batch_size=batch_size,
+                                        num_workers=cfg.train_cfg['num_workers'],
+                                        use_shared_memory=False,   # use_shared_memory=True且num_workers>0时会报错。
+                                        shuffle=False, drop_last=True)
+
     # 输出几个特征图
     n_layers = len(cfg.head['anchor_masks'])
 
@@ -420,54 +445,34 @@ if __name__ == '__main__':
     else:
         print('don\'t use mosaic.')
 
-    # 读数据的线程
-    train_dic ={}
-    thr = threading.Thread(target=read_train_data,
-                           args=(cfg,
-                                 train_indexes,
-                                 train_steps,
-                                 train_records,
-                                 batch_size,
-                                 iter_id,
-                                 train_dic,
-                                 use_gpu,
-                                 n_layers,
-                                 context, with_mixup, with_cutmix, with_mosaic, mixup_steps, cutmix_steps, mosaic_steps, sample_transforms, batch_transforms))
-    thr.start()
-
 
     nowTime = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     log_filename = 'log%s.txt'%nowTime
     best_ap_list = [0.0, 0]  #[map, iter]
-    while True:   # 无限个epoch
-        for step in range(train_steps):
+    init_iter_id = iter_id
+    for _ in range(1):   # 已经被整理成1个epoch
+        for step, data in enumerate(train_loader):
+            if step < init_iter_id:  # 恢复训练时跳过。
+                continue
             iter_id += 1
-
-            key_list = list(train_dic.keys())
-            key_len = len(key_list)
-            while key_len == 0:
-                time.sleep(0.01)
-                key_list = list(train_dic.keys())
-                key_len = len(key_list)
-            dic = train_dic.pop('%.8d'%iter_id)
 
             # 估计剩余时间
             start_time = end_time
             end_time = time.time()
             time_stat.append(end_time - start_time)
-            time_cost = np.mean(time_stat)
-            eta_sec = (cfg.train_cfg['max_iters'] - iter_id) * time_cost
+            time_cost = np.mean(time_stat)   # time_cost=平均每一步需要多少秒
+            eta_sec = (cfg.train_cfg['max_iters'] - iter_id) * time_cost   # 剩余时间=剩余步数*time_cost
             eta = str(datetime.timedelta(seconds=int(eta_sec)))
 
             # ==================== train ====================
-            images = dic['images']
-            gt_bbox = dic['gt_bbox']
-            gt_score = dic['gt_score']
-            gt_class = dic['gt_class']
-            target0 = dic['target0']
-            target1 = dic['target1']
+            images = data[0]
+            gt_bbox = data[1]
+            gt_score = data[2]
+            gt_class = data[3]
+            target0 = data[4]
+            target1 = data[5]
             if n_layers > 2:
-                target2 = dic['target2']
+                target2 = data[6]
                 targets = [target0, target1, target2]
             else:
                 targets = [target0, target1]
@@ -555,9 +560,7 @@ if __name__ == '__main__':
                 logger.info("Best test ap: {}, in iter: {}".format(best_ap_list[0], best_ap_list[1]))
                 write(log_filename, "Best test ap: {}, in iter: {}".format(best_ap_list[0], best_ap_list[1]))
 
-            # ==================== exit ====================
-            if iter_id == cfg.train_cfg['max_iters']:
-                logger.info('Done.')
-                write(log_filename, 'Done.')
-                exit(0)
+        # ==================== exit ====================
+        logger.info('Done.')
+        write(log_filename, 'Done.')
 
