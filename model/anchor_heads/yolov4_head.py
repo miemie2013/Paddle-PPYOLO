@@ -15,7 +15,7 @@ import paddle.fluid.layers as L
 import copy
 
 from model.custom_layers import *
-from model.head import get_iou_aware_score
+from model.anchor_heads.yolov3_head import get_iou_aware_score
 
 
 class YOLOv4Head(paddle.nn.Layer):

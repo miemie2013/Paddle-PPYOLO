@@ -16,9 +16,9 @@ import paddle
 import json
 
 from tools.cocotools import eval
-from model.decode_yolo import Decode_YOLO
-from model.ppyolo import PPYOLO
-from tools.yoloargparser import YOLOArgParser
+from model.decoders.decode_yolo import *
+from model.architectures.yolo import *
+from tools.argparser import YOLOArgParser
 from tools.cocotools import get_classes
 
 import logging

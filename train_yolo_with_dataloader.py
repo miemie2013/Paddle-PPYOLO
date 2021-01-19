@@ -20,10 +20,10 @@ import json
 from config import *
 from model.EMA import ExponentialMovingAverage
 
-from model.ppyolo import *
 from tools.argparser import *
 from tools.cocotools import get_classes, catid2clsid, clsid2catid
-from model.decode_yolo import *
+from model.decoders.decode_yolo import *
+from model.architectures.yolo import *
 from tools.cocotools import eval
 from tools.data_process import data_clean, get_samples
 from tools.transform import *
@@ -278,7 +278,7 @@ if __name__ == '__main__':
     Head = select_head(cfg.head_type)
     head = Head(yolo_loss=yolo_loss, is_train=True, nms_cfg=cfg.nms_cfg, **cfg.head)
     model = PPYOLO(backbone, head)
-    _decode = Decode(model, class_names, place, cfg, for_test=False)
+    _decode = Decode_YOLO(model, class_names, place, cfg, for_test=False)
 
     # optimizer
     regularization = None

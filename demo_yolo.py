@@ -18,8 +18,8 @@ import textwrap
 import paddle
 
 from config import *
-from model.decode_yolo import *
-from model.ppyolo import *
+from model.decoders.decode_yolo import *
+from model.architectures.yolo import *
 from tools.argparser import *
 from tools.cocotools import get_classes
 
@@ -91,7 +91,7 @@ if __name__ == '__main__':
     model.eval()  # 必须调用model.eval()来设置dropout和batch normalization layers在运行推理前，切换到评估模式。
     head.set_dropblock(is_test=True)
 
-    _decode = Decode(model, class_names, place, cfg, for_test=True)
+    _decode = Decode_YOLO(model, class_names, place, cfg, for_test=True)
 
     if not os.path.exists('images/res/'): os.mkdir('images/res/')
     path_dir = os.listdir('images/test')

@@ -10,7 +10,7 @@
 import paddle
 import paddle.nn.functional as F
 from model.custom_layers import *
-from model.resnet_vd import IdentityBlock
+from model.backbones.resnet_vd import IdentityBlock
 
 
 class ConvBlock(paddle.nn.Layer):

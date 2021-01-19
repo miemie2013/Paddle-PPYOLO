@@ -20,10 +20,10 @@ import json
 from config import *
 from model.EMA import ExponentialMovingAverage
 
-from model.ppyolo import *
 from tools.argparser import *
 from tools.cocotools import get_classes, catid2clsid, clsid2catid
-from model.decode_yolo import *
+from model.decoders.decode_yolo import *
+from model.architectures.yolo import *
 from tools.cocotools import eval
 from tools.data_process import data_clean, get_samples
 from tools.transform import *

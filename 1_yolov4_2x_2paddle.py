@@ -8,7 +8,7 @@
 #
 # ================================================================
 from config import *
-from model.ppyolo import PPYOLO
+from model.architectures.yolo import PPYOLO
 import paddle.fluid as fluid
 import paddle
 import torch

@@ -16,8 +16,8 @@ import paddle
 import json
 
 from tools.cocotools import eval
-from model.decode_yolo import *
-from model.ppyolo import PPYOLO
+from model.decoders.decode_yolo import *
+from model.architectures.yolo import *
 from tools.argparser import *
 from tools.cocotools import get_classes
 
@@ -103,6 +103,6 @@ if __name__ == '__main__':
     model.eval()  # 必须调用model.eval()来设置dropout和batch normalization layers在运行推理前，切换到评估模式。
     head.set_dropblock(is_test=True)
 
-    _decode = Decode(model, class_names, place, cfg, for_test=False)
+    _decode = Decode_YOLO(model, class_names, place, cfg, for_test=False)
     box_ap = eval(_decode, images, eval_pre_path, anno_file, eval_batch_size, _clsid2catid, draw_image, draw_thresh)
 
