@@ -788,6 +788,99 @@ class RandomCrop(BaseOperator):
         return img[y1:y2, x1:x2, :]
 
 
+class GridMaskOp(BaseOperator):
+    def __init__(self,
+                 use_h=True,
+                 use_w=True,
+                 rotate=1,
+                 offset=False,
+                 ratio=0.5,
+                 mode=1,
+                 prob=0.7,
+                 upper_iter=360000):
+        """
+        GridMask Data Augmentation, see https://arxiv.org/abs/2001.04086
+        Args:
+            use_h (bool): whether to mask vertically
+            use_w (boo;): whether to mask horizontally
+            rotate (float): angle for the mask to rotate
+            offset (float): mask offset
+            ratio (float): mask ratio
+            mode (int): gridmask mode
+            prob (float): max probability to carry out gridmask
+            upper_iter (int): suggested to be equal to global max_iter
+        """
+        super(GridMaskOp, self).__init__()
+        self.use_h = use_h
+        self.use_w = use_w
+        self.rotate = rotate
+        self.offset = offset
+        self.ratio = ratio
+        self.mode = mode
+        self.prob = prob
+        self.upper_iter = upper_iter
+
+        from .gridmask_utils import GridMask
+        self.gridmask_op = GridMask(
+            use_h,
+            use_w,
+            rotate=rotate,
+            offset=offset,
+            ratio=ratio,
+            mode=mode,
+            prob=prob,
+            upper_iter=upper_iter)
+
+    def __call__(self, sample, context=None):
+        samples = sample
+        batch_input = True
+        if not isinstance(samples, Sequence):
+            batch_input = False
+            samples = [samples]
+        for sample in samples:
+            sample['image'] = self.gridmask_op(sample['image'],
+                                               sample['curr_iter'])
+        if not batch_input:
+            samples = samples[0]
+        return samples
+
+
+class Poly2Mask(BaseOperator):
+    """
+    gt poly to mask annotations
+    """
+
+    def __init__(self):
+        super(Poly2Mask, self).__init__()
+        import pycocotools.mask as maskUtils
+        self.maskutils = maskUtils
+
+    def _poly2mask(self, mask_ann, img_h, img_w):
+        if isinstance(mask_ann, list):
+            # polygon -- a single object might consist of multiple parts
+            # we merge all parts into one mask rle code
+            rles = self.maskutils.frPyObjects(mask_ann, img_h, img_w)
+            rle = self.maskutils.merge(rles)
+        elif isinstance(mask_ann['counts'], list):
+            # uncompressed RLE
+            rle = self.maskutils.frPyObjects(mask_ann, img_h, img_w)
+        else:
+            # rle
+            rle = mask_ann
+        mask = self.maskutils.decode(rle)
+        return mask
+
+    def __call__(self, sample, context=None):
+        assert 'gt_poly' in sample
+        im_h = sample['h']
+        im_w = sample['w']
+        masks = [
+            self._poly2mask(gt_poly, im_h, im_w)
+            for gt_poly in sample['gt_poly']
+        ]
+        sample['gt_segm'] = np.asarray(masks).astype(np.uint8)
+        return sample
+
 
 class ColorDistort(BaseOperator):
     """Random color distortion.
