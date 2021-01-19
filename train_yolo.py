@@ -204,7 +204,7 @@ def write(filename, logstats):
         f.close
 
 if __name__ == '__main__':
-    parser = ArgParser()
+    parser = YOLOArgParser()
     use_gpu = parser.get_use_gpu()
     cfg = parser.get_cfg()
     print(paddle.__version__)
