@@ -43,7 +43,7 @@ class FCOS_R50_FPN_Multiscale_2x_Config(object):
 
         # ========= 一些设置 =========
         self.train_cfg = dict(
-            batch_size=2,
+            batch_size=16,
             num_workers=5,   # 读数据的进程数
             num_threads=5,   # 读数据的线程数
             max_batch=2,     # 最大读多少个批
@@ -115,7 +115,7 @@ class FCOS_R50_FPN_Multiscale_2x_Config(object):
             feature_maps=[3, 4, 5],
             dcn_v2_stages=[],
             downsample_in3x3=True,   # 注意这个细节，是在3x3卷积层下采样的。
-            freeze_at=2,
+            freeze_at=5,
             fix_bn_mean_var_at=0,
             freeze_norm=False,
             norm_decay=0.,
