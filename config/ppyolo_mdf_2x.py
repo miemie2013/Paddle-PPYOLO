@@ -44,6 +44,7 @@ class PPYOLO_mdf_2x_Config(object):
         # ========= 一些设置 =========
         self.train_cfg = dict(
             batch_size=24,
+            num_workers=5,   # 读数据的进程数
             num_threads=5,   # 读数据的线程数
             max_batch=3,     # 最大读多少个批
             # model_path='dygraph_ppyolo_2x.pdparams',
