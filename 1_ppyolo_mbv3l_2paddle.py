@@ -8,7 +8,7 @@
 #
 # ================================================================
 from config import *
-from model.architectures.yolo import PPYOLO
+from model.architectures.yolo import *
 import paddle.fluid as fluid
 import paddle
 import os

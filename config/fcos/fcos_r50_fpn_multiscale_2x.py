@@ -44,16 +44,20 @@ class FCOS_R50_FPN_Multiscale_2x_Config(object):
         # ========= 一些设置 =========
         self.train_cfg = dict(
             batch_size=2,
+            num_workers=5,   # 读数据的进程数
             num_threads=5,   # 读数据的线程数
             max_batch=2,     # 最大读多少个批
             model_path='dygraph_fcos_r50_fpn_multiscale_2x.pdparams',
             # model_path='dygraph_r50vd_ssld.pdparams',
             # model_path='./weights/1000.pdparams',
+            update_iter=1,    # 每隔几步更新一次参数
+            log_iter=20,      # 每隔几步打印一次
             save_iter=1000,   # 每隔几步保存一次模型
             eval_iter=20000,   # 每隔几步计算一次eval集的mAP
             max_iters=180000,   # 训练多少步
-            mixup_epoch=-1,     # 前几轮进行mixup
-            cutmix_epoch=-1,    # 前几轮进行cutmix
+            mixup_epoch=10,     # 前几轮进行mixup
+            cutmix_epoch=10,    # 前几轮进行cutmix
+            mosaic_epoch=1000,  # 前几轮进行mosaic
         )
         self.learningRate = dict(
             base_lr=0.01,
@@ -94,7 +98,6 @@ class FCOS_R50_FPN_Multiscale_2x_Config(object):
             model_path='dygraph_fcos_r50_fpn_multiscale_2x.pdparams',
             # model_path='./weights/1000.pdparams',
             target_size=800,
-            # target_size=320,
             max_size=1333,
             draw_image=True,
             draw_thresh=0.15,   # 如果draw_image==True，那么只画出分数超过draw_thresh的物体的预测框。
@@ -105,6 +108,7 @@ class FCOS_R50_FPN_Multiscale_2x_Config(object):
         # self.use_ema = True
         self.use_ema = False
         self.ema_decay = 0.9998
+        self.ema_iter = 1
         self.backbone_type = 'Resnet50Vb'
         self.backbone = dict(
             norm_type='affine_channel',
@@ -112,6 +116,7 @@ class FCOS_R50_FPN_Multiscale_2x_Config(object):
             dcn_v2_stages=[],
             downsample_in3x3=True,   # 注意这个细节，是在3x3卷积层下采样的。
             freeze_at=2,
+            fix_bn_mean_var_at=0,
             freeze_norm=False,
             norm_decay=0.,
         )
@@ -170,6 +175,7 @@ class FCOS_R50_FPN_Multiscale_2x_Config(object):
             to_rgb=True,
             with_mixup=False,
             with_cutmix=False,
+            with_mosaic=False,
         )
         # RandomFlipImage
         self.randomFlipImage = dict(
