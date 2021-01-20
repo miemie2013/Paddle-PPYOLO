@@ -46,7 +46,7 @@ class PPYOLO_mobilenet_v3_large_Config(object):
             batch_size=32,
             num_workers=5,   # 读数据的进程数
             num_threads=5,   # 读数据的线程数
-            max_batch=3,     # 最大读多少个批
+            max_batch=2,     # 最大读多少个批
             model_path='dygraph_ppyolo_mobilenet_v3_large.pdparams',
             # model_path='./weights/1000.pdparams',
             update_iter=4,    # 每隔几步更新一次参数

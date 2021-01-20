@@ -46,7 +46,7 @@ class PPYOLO_r18vd_Config(object):
             batch_size=8,
             num_workers=5,   # 读数据的进程数
             num_threads=5,   # 读数据的线程数
-            max_batch=3,     # 最大读多少个批
+            max_batch=2,     # 最大读多少个批
             model_path='dygraph_ppyolo_r18vd.pdparams',
             # model_path='./weights/1000.pdparams',
             update_iter=1,    # 每隔几步更新一次参数
