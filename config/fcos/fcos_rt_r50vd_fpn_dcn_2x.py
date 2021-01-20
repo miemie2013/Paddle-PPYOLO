@@ -142,6 +142,13 @@ class FCOS_RT_R50VD_FPN_DCN_2x_Config(object):
             thresh_with_ctr=True,
             centerness_on_reg=True,
             use_dcn_in_tower=False,
+
+            coord_conv=False,
+            iou_aware=False,
+            iou_aware_factor=0.4,
+            spp=False,
+            drop_block=True,
+            dcn_v2_stages=[3],   # 可填[0, 1, 2, ..., num_convs-1]
         )
         self.fcos_loss_type = 'FCOSLoss'
         self.fcos_loss = dict(
@@ -192,6 +199,14 @@ class FCOS_RT_R50VD_FPN_DCN_2x_Config(object):
             alpha=1.5,
             beta=1.5,
         )
+        # ColorDistort。新增的数据增强。
+        self.colorDistort = dict()
+        # RandomExpand。新增的数据增强。
+        self.randomExpand = dict(
+            fill_value=[123.675, 116.28, 103.53],
+        )
+        # RandomCrop。新增的数据增强。
+        self.randomCrop = dict()
         # RandomFlipImage
         self.randomFlipImage = dict(
             prob=0.5,
@@ -202,6 +217,17 @@ class FCOS_RT_R50VD_FPN_DCN_2x_Config(object):
             is_scale=True,
             mean=[0.485, 0.456, 0.406],
             std=[0.229, 0.224, 0.225],
+        )
+        # GridMaskOp。新增的数据增强。
+        self.gridMaskOp = dict(
+            use_h=True,
+            use_w=True,
+            rotate=1,
+            offset=False,
+            ratio=0.5,
+            mode=1,
+            prob=0.7,
+            upper_iter=360000,
         )
         # ResizeImage
         # 图片短的那一边缩放到选中的target_size，长的那一边等比例缩放；如果这时候长的那一边大于max_size，
@@ -242,8 +268,12 @@ class FCOS_RT_R50VD_FPN_DCN_2x_Config(object):
             self.sample_transforms_seq.append('cutmixImage')
         elif self.decodeImage['with_mosaic']:
             self.sample_transforms_seq.append('mosaicImage')
+        self.sample_transforms_seq.append('colorDistort')   # 迁移学习2000步发现对voc2012有积极作用。
+        # self.sample_transforms_seq.append('randomExpand')   # 迁移学习2000步发现可能对voc2012有负面作用，需要训练饱和才能确定。
+        # self.sample_transforms_seq.append('randomCrop')     # 迁移学习2000步发现可能对voc2012有负面作用，需要训练饱和才能确定。
         self.sample_transforms_seq.append('randomFlipImage')
         self.sample_transforms_seq.append('normalizeImage')
+        self.sample_transforms_seq.append('gridMaskOp')   # 迁移学习2000步发现对voc2012有积极作用。
         self.sample_transforms_seq.append('resizeImage')
         self.sample_transforms_seq.append('permute')
         self.batch_transforms_seq = []
