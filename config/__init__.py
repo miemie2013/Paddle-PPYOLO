@@ -20,5 +20,6 @@ from .ppyolo.ppyolo_large_2x import *
 from .fcos.fcos_r50_fpn_multiscale_2x import *
 from .fcos.fcos_rt_r50_fpn_4x import *
 from .fcos.fcos_rt_dla34_fpn_4x import *
+from .fcos.fcos_rt_r50vd_fpn_dcn_2x import *
 
 

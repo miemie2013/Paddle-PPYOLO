@@ -65,8 +65,8 @@ class FCOSArgParser(object):
                             0 -- fcos_r50_fpn_multiscale_2x.py
                             1 -- fcos_rt_r50_fpn_4x.py
                             2 -- fcos_rt_dla34_fpn_4x.py
-                            3 -- fcos_rt_r50_enhance_fpn_4x.py
-                            4 -- fcos_rt_r50_vd_fpn_dcn_3x.py'''))
+                            3 -- fcos_rt_r50vd_fpn_dcn_2x.py
+                            4 -- aaaaaaaaaaaaaaa.py'''))
         self.args = parser.parse_args()
         self.config_file = self.args.config
         self.use_gpu = self.args.use_gpu
@@ -83,8 +83,8 @@ class FCOSArgParser(object):
             cfg = FCOS_RT_R50_FPN_4x_Config()
         elif config_file == 2:
             cfg = FCOS_RT_DLA34_FPN_4x_Config()
-        # elif config_file == 3:
-        #     cfg = FCOS_RT_R50_FPN_enhance_4x_Config()
+        elif config_file == 3:
+            cfg = FCOS_RT_R50VD_FPN_DCN_2x_Config()
         # elif config_file == 4:
         #     cfg = FCOS_RT_r50_vd_fpn_dcn_3x_Config()
         return cfg

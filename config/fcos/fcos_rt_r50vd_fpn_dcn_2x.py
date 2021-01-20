@@ -10,7 +10,7 @@
 
 
 
-class FCOS_RT_r50_vd_fpn_dcn_3x_Config(object):
+class FCOS_RT_R50VD_FPN_DCN_2x_Config(object):
     def __init__(self):
         # 自定义数据集
         # self.train_path = 'annotation_json/voc2012_train.json'
@@ -43,23 +43,27 @@ class FCOS_RT_r50_vd_fpn_dcn_3x_Config(object):
 
         # ========= 一些设置 =========
         self.train_cfg = dict(
-            batch_size=12,
+            batch_size=16,
+            num_workers=5,   # 读数据的进程数
             num_threads=5,   # 读数据的线程数
             max_batch=2,     # 最大读多少个批
-            # model_path='dygraph_fcos_rt_r50vd_fpn_3x.pdparams',
+            # model_path='aaaaaaaaaaaaa.pdparams',
             model_path='dygraph_r50vd_ssld.pdparams',
             # model_path='./weights/1000.pdparams',
+            update_iter=1,    # 每隔几步更新一次参数
+            log_iter=20,      # 每隔几步打印一次
             save_iter=1000,   # 每隔几步保存一次模型
             eval_iter=20000,   # 每隔几步计算一次eval集的mAP
-            max_iters=270000,   # 训练多少步
+            max_iters=180000,   # 训练多少步
             mixup_epoch=10,     # 前几轮进行mixup
-            cutmix_epoch=-1,    # 前几轮进行cutmix
+            cutmix_epoch=10,    # 前几轮进行cutmix
+            mosaic_epoch=1000,  # 前几轮进行mosaic
         )
         self.learningRate = dict(
             base_lr=0.01,
             PiecewiseDecay=dict(
                 gamma=0.1,
-                milestones=[180000, 240000],
+                milestones=[120000, 160000],
             ),
             LinearWarmup=dict(
                 start_factor=0.3333333333333333,
@@ -80,21 +84,20 @@ class FCOS_RT_r50_vd_fpn_dcn_3x_Config(object):
 
         # 验证。用于train.py、eval.py、test_dev.py
         self.eval_cfg = dict(
-            model_path='dygraph_fcos_rt_r50vd_fpn_3x.pdparams',
+            model_path='aaaaaaaaaaaaa.pdparams',
             # model_path='./weights/1000.pdparams',
             target_size=512,
             max_size=736,
             draw_image=False,    # 是否画出验证集图片
             draw_thresh=0.15,    # 如果draw_image==True，那么只画出分数超过draw_thresh的物体的预测框。
-            eval_batch_size=8,   # 验证时的批大小。
+            eval_batch_size=1,   # 验证时的批大小。
         )
 
         # 测试。用于demo.py
         self.test_cfg = dict(
-            model_path='dygraph_fcos_rt_r50vd_fpn_3x.pdparams',
+            model_path='aaaaaaaaaaaaa.pdparams',
             # model_path='./weights/1000.pdparams',
             target_size=512,
-            # target_size=320,
             max_size=736,
             draw_image=True,
             draw_thresh=0.15,   # 如果draw_image==True，那么只画出分数超过draw_thresh的物体的预测框。
@@ -105,16 +108,17 @@ class FCOS_RT_r50_vd_fpn_dcn_3x_Config(object):
         self.use_ema = True
         # self.use_ema = False
         self.ema_decay = 0.9998
+        self.ema_iter = 20
         self.backbone_type = 'Resnet50Vd'
         self.backbone = dict(
-            norm_type='sync_bn',
+            norm_type='bn',
             feature_maps=[3, 4, 5],
-            dcn_v2_stages=[3, 4, 5],
+            dcn_v2_stages=[5],
             downsample_in3x3=True,   # 注意这个细节，是在3x3卷积层下采样的。
-            freeze_at=0,
+            freeze_at=4,
+            fix_bn_mean_var_at=0,
             freeze_norm=False,
             norm_decay=0.,
-            lr_mult_list=[0.05, 0.05, 0.1, 0.15],
         )
         self.fpn_type = 'FPN'
         self.fpn = dict(
@@ -143,46 +147,51 @@ class FCOS_RT_r50_vd_fpn_dcn_3x_Config(object):
         self.fcos_loss = dict(
             loss_alpha=0.25,
             loss_gamma=2.0,
-            iou_loss_type='ciou',  # linear_iou/giou/iou/ciou
+            iou_loss_type='giou',  # linear_iou/giou/iou/ciou
             reg_weights=1.0,
         )
+        # self.nms_cfg = dict(
+        #     nms_type='matrix_nms',
+        #     score_threshold=0.01,
+        #     post_threshold=0.01,
+        #     nms_top_k=500,
+        #     keep_top_k=100,
+        #     use_gaussian=False,
+        #     gaussian_sigma=2.,
+        # )
         self.nms_cfg = dict(
-            nms_type='matrix_nms',
-            score_threshold=0.01,
-            post_threshold=0.01,
-            nms_top_k=500,
+            nms_type='multiclass_nms',
+            score_threshold=0.025,
+            nms_threshold=0.6,
+            nms_top_k=1000,
             keep_top_k=100,
-            use_gaussian=False,
-            gaussian_sigma=2.,
         )
 
 
         # ============= 预处理相关 =============
         self.context = {'fields': ['image', 'im_info', 'fcos_target']}
-        # DecodeImage。mixup和cutmix只能同时使用一个。
+        # DecodeImage
         self.decodeImage = dict(
             to_rgb=True,
             with_mixup=True,
             with_cutmix=False,
+            with_mosaic=False,
         )
-        # MixupImage。新增的数据增强。
+        # MixupImage
         self.mixupImage = dict(
             alpha=1.5,
             beta=1.5,
         )
-        # CutmixImage。新增的数据增强。
+        # CutmixImage
         self.cutmixImage = dict(
             alpha=1.5,
             beta=1.5,
         )
-        # ColorDistort。新增的数据增强。
-        self.colorDistort = dict()
-        # RandomExpand。新增的数据增强。
-        self.randomExpand = dict(
-            fill_value=[123.675, 116.28, 103.53],
+        # MosaicImage
+        self.mosaicImage = dict(
+            alpha=1.5,
+            beta=1.5,
         )
-        # RandomCrop。新增的数据增强。
-        self.randomCrop = dict()
         # RandomFlipImage
         self.randomFlipImage = dict(
             prob=0.5,
@@ -190,20 +199,9 @@ class FCOS_RT_r50_vd_fpn_dcn_3x_Config(object):
         # NormalizeImage
         self.normalizeImage = dict(
             is_channel_first=False,
-            is_scale=False,
-            mean=[123.675, 116.28, 103.53],
-            std=[58.395, 57.12, 57.375],
-        )
-        # GridMaskOp。新增的数据增强。
-        self.gridMaskOp = dict(
-            use_h=True,
-            use_w=True,
-            rotate=1,
-            offset=False,
-            ratio=0.5,
-            mode=1,
-            prob=0.7,
-            upper_iter=360000,
+            is_scale=True,
+            mean=[0.485, 0.456, 0.406],
+            std=[0.229, 0.224, 0.225],
         )
         # ResizeImage
         # 图片短的那一边缩放到选中的target_size，长的那一边等比例缩放；如果这时候长的那一边大于max_size，
@@ -238,14 +236,14 @@ class FCOS_RT_r50_vd_fpn_dcn_3x_Config(object):
         # 预处理顺序。增加一些数据增强时这里也要加上，否则train.py中相当于没加！
         self.sample_transforms_seq = []
         self.sample_transforms_seq.append('decodeImage')
-        self.sample_transforms_seq.append('mixupImage')
-        # self.sample_transforms_seq.append('cutmixImage')
-        self.sample_transforms_seq.append('colorDistort')
-        self.sample_transforms_seq.append('randomExpand')
-        self.sample_transforms_seq.append('randomCrop')
+        if self.decodeImage['with_mixup']:
+            self.sample_transforms_seq.append('mixupImage')
+        elif self.decodeImage['with_cutmix']:
+            self.sample_transforms_seq.append('cutmixImage')
+        elif self.decodeImage['with_mosaic']:
+            self.sample_transforms_seq.append('mosaicImage')
         self.sample_transforms_seq.append('randomFlipImage')
         self.sample_transforms_seq.append('normalizeImage')
-        self.sample_transforms_seq.append('gridMaskOp')
         self.sample_transforms_seq.append('resizeImage')
         self.sample_transforms_seq.append('permute')
         self.batch_transforms_seq = []

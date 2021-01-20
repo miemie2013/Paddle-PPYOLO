@@ -86,8 +86,8 @@ parser.add_argument('-c', '--config', type=int, default=0,
                     0 -- fcos_r50_fpn_multiscale_2x.py
                     1 -- fcos_rt_r50_fpn_4x.py
                     2 -- fcos_rt_dla34_fpn_4x.py
-                    3 -- fcos_rt_r50_enhance_fpn_4x.py
-                    4 -- fcos_rt_r50_vd_fpn_dcn_3x.py'''))
+                    3 -- fcos_rt_r50vd_fpn_dcn_2x.py
+                    4 -- aaaaaaaaaaaaaa.py'''))
 
 训练
 cd ~/w*
