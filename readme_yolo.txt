@@ -45,6 +45,16 @@ rm -rf ResNet50_vd_ssld_pretrained
 
 
 
+下载预训练模型ResNet50_cos_pretrained.tar
+cd ~/w*
+wget https://paddle-imagenet-models-name.bj.bcebos.com/ResNet50_cos_pretrained.tar
+tar -xf ResNet50_cos_pretrained.tar
+python 1_r50vb_cos_2paddle.py
+rm -f ResNet50_cos_pretrained.tar
+rm -rf ResNet50_cos_pretrained
+
+
+
 下载预训练模型ppyolo_r18vd.pdparams
 cd ~/w*
 wget https://paddlemodels.bj.bcebos.com/object_detection/ppyolo_r18vd.pdparams

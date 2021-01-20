@@ -48,7 +48,7 @@ class FCOS_R50_FPN_Multiscale_2x_Config(object):
             num_threads=5,   # 读数据的线程数
             max_batch=2,     # 最大读多少个批
             model_path='dygraph_fcos_r50_fpn_multiscale_2x.pdparams',
-            # model_path='dygraph_r50vd_ssld.pdparams',
+            # model_path='dygraph_r50vb_cos.pdparams',
             # model_path='./weights/1000.pdparams',
             update_iter=1,    # 每隔几步更新一次参数
             log_iter=20,      # 每隔几步打印一次

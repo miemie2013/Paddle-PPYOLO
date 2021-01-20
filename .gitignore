@@ -20,7 +20,7 @@ __pycache__/
 
 
 /inference_model/
-/ResNet50_vd_ssld_pretrained/
+/ResNet50*/
 /output/
 
 
