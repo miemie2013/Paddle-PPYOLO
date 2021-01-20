@@ -176,6 +176,21 @@ class FCOS_RT_DLA34_FPN_4x_Config(object):
             with_cutmix=False,
             with_mosaic=False,
         )
+        # MixupImage
+        self.mixupImage = dict(
+            alpha=1.5,
+            beta=1.5,
+        )
+        # CutmixImage
+        self.cutmixImage = dict(
+            alpha=1.5,
+            beta=1.5,
+        )
+        # MosaicImage
+        self.mosaicImage = dict(
+            alpha=1.5,
+            beta=1.5,
+        )
         # RandomFlipImage
         self.randomFlipImage = dict(
             prob=0.5,
@@ -220,6 +235,12 @@ class FCOS_RT_DLA34_FPN_4x_Config(object):
         # 预处理顺序。增加一些数据增强时这里也要加上，否则train.py中相当于没加！
         self.sample_transforms_seq = []
         self.sample_transforms_seq.append('decodeImage')
+        if self.decodeImage['with_mixup']:
+            self.sample_transforms_seq.append('mixupImage')
+        elif self.decodeImage['with_cutmix']:
+            self.sample_transforms_seq.append('cutmixImage')
+        elif self.decodeImage['with_mosaic']:
+            self.sample_transforms_seq.append('mosaicImage')
         self.sample_transforms_seq.append('randomFlipImage')
         self.sample_transforms_seq.append('normalizeImage')
         self.sample_transforms_seq.append('resizeImage')
