@@ -25,8 +25,16 @@ gpu_id = int(os.environ.get('FLAGS_selected_gpus', 0))
 place = paddle.CUDAPlace(gpu_id) if use_gpu else paddle.CPUPlace()
 
 
-
-cfg = PPYOLO_2x_Config()
+backbone_cfg = dict(
+    norm_type='bn',
+    feature_maps=[3, 4, 5],
+    dcn_v2_stages=[],
+    downsample_in3x3=True,  # 注意这个细节，是在3x3卷积层下采样的。
+    freeze_at=0,
+    fix_bn_mean_var_at=0,
+    freeze_norm=False,
+    norm_decay=0.,
+)
 model_path = 'ResNet50_vd_ssld_pretrained'
 
 
@@ -42,11 +50,9 @@ print('============================================================')
 
 
 # 创建模型
-Backbone = select_backbone(cfg.backbone_type)
-backbone = Backbone(**cfg.backbone)
-Head = select_head(cfg.head_type)
-head = Head(yolo_loss=None, nms_cfg=cfg.nms_cfg, **cfg.head)
-ppyolo = PPYOLO(backbone, head)
+Backbone = select_backbone('Resnet50Vd')
+backbone = Backbone(**backbone_cfg)
+ppyolo = PPYOLO(backbone, head=None)
 
 ppyolo.eval()  # 必须调用model.eval()来设置dropout和batch normalization layers在运行推理前，切换到评估模式。
 param_state_dict = ppyolo.state_dict()
@@ -122,7 +128,7 @@ for nid, num in enumerate(nums):
         conv_unit_name = 'backbone.stage%d_%d.conv1' % (2+nid, kk)
         copy_conv_bn(conv_unit_name, w, scale, offset, m, v)
 
-        if nid == 3:   # DCNv2
+        if (nid+2) in backbone_cfg['dcn_v2_stages']:   # DCNv2
             w = state_dict[conv_name2 + '_weights']
             scale = state_dict[bn_name2 + '_scale']
             offset = state_dict[bn_name2 + '_offset']

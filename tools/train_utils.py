@@ -30,7 +30,7 @@ def load_weights(model, model_path):
             if shape_1 == shape_2:
                 new_state_dict[k] = v
             else:
-                print('shape mismatch in %s. shape_1=%s, while shape_2=%s.' % (k, shape_1, shape_2))
+                print('shape mismatch in \'%s\'. model_shape=%s, while pretrained_shape=%s.' % (k, shape_1, shape_2))
     _state_dict.update(new_state_dict)
     model.set_state_dict(_state_dict)
 
