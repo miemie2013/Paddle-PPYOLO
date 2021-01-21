@@ -312,6 +312,7 @@ class Conv2dUnit(paddle.nn.Layer):
         # conv
         conv_name = name
         self.dcn_param = None
+        self.dcn_bias = None
         if use_dcn:
             self.conv = paddle.nn.Conv2D(input_dim,
                                          filter_size * filter_size * 3,
@@ -325,6 +326,19 @@ class Conv2dUnit(paddle.nn.Layer):
                 dtype='float32',
                 attr=ParamAttr(name=conv_name + "_dcn_weights", learning_rate=lr, initializer=weight_init),
                 default_initializer=fluid.initializer.Xavier())
+            if bias_attr:
+                blr = lr
+                if bias_lr:
+                    blr = bias_lr
+                conv_battr = ParamAttr(name=conv_name + "_dcn_bias",
+                                       learning_rate=blr,
+                                       initializer=bias_init,
+                                       regularizer=L2Decay(0.))   # 不可以加正则化的参数：norm层(比如bn层、affine_channel层、gn层)的scale、offset；卷积层的偏移参数。
+                self.dcn_bias = fluid.layers.create_parameter(
+                    shape=[filters, ],
+                    dtype='float32',
+                    attr=conv_battr,
+                    default_initializer=Constant(0.0))
         else:
             conv_battr = False
             if bias_attr:
@@ -458,6 +472,9 @@ class Conv2dUnit(paddle.nn.Layer):
             #                     im2col_step=1,
             #                     filter_param=self.dcn_param,
             #                     bias_attr=False)
+            if self.dcn_bias is not None:
+                b = L.reshape(self.dcn_bias, (1, self.filters, 1, 1))
+                x += b
         else:
             x = self.conv(x)
         if self.bn:

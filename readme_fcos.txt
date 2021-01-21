@@ -32,6 +32,12 @@ python 1_paddle_fcos_r50_fpn_multiscale_2x2paddle.py
 rm -f fcos_r50_fpn_multiscale_2x.pdparams
 
 
+下载预训练模型fcos_dcn_r50_fpn_1x.pdparams
+cd ~/w*
+wget https://paddlemodels.bj.bcebos.com/object_detection/fcos_dcn_r50_fpn_1x.pdparams
+python 1_paddle_fcos_dcn_r50_fpn_1x2paddle.py
+rm -f fcos_dcn_r50_fpn_1x.pdparams
+
 
 
 下载预训练模型ResNet50_vd_ssld_pretrained.tar
@@ -87,7 +93,7 @@ parser.add_argument('-c', '--config', type=int, default=0,
                     1 -- fcos_rt_r50_fpn_4x.py
                     2 -- fcos_rt_dla34_fpn_4x.py
                     3 -- fcos_rt_r50vd_fpn_dcn_2x.py
-                    4 -- aaaaaaaaaaaaaa.py'''))
+                    4 -- fcos_dcn_r50_fpn_1x.py'''))
 
 训练
 cd ~/w*

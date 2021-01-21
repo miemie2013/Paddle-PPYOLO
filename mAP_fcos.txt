@@ -3,6 +3,27 @@
 
 
 ------------------------------------------------------------------------------------------
+dygraph_fcos_dcn_r50_fpn_1x.pdparams
+
+(val2017)
+Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.443
+Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.629
+Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.482
+Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.277
+Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.481
+Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.584
+Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.352
+Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.573
+Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.612
+Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = 0.417
+Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = 0.663
+Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.778
+
+
+
+
+
+------------------------------------------------------------------------------------------
 dygraph_fcos_r50_fpn_multiscale_2x.pdparams
 
 (val2017, V100测速, eval_batch_size=1)
