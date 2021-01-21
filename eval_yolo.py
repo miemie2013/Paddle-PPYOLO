@@ -7,19 +7,11 @@
 #   Description : paddle2.0_ppyolo
 #
 # ================================================================
-from config import *
-from tools.cocotools import get_classes, catid2clsid, clsid2catid
-import os
-import argparse
-import textwrap
-import paddle
 import json
-
-from tools.cocotools import eval
+from tools.cocotools_yolo import eval
 from model.decoders.decode_yolo import *
 from model.architectures.yolo import *
 from tools.argparser import *
-from tools.cocotools import get_classes
 
 import logging
 FORMAT = '%(asctime)s-%(levelname)s: %(message)s'

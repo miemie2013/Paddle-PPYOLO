@@ -15,8 +15,8 @@ import json
 from model.EMA import ExponentialMovingAverage
 from model.decoders.decode_yolo import *
 from model.architectures.yolo import *
+from tools.cocotools_yolo import eval
 from tools.argparser import *
-from tools.cocotools import eval
 from tools.data_process import data_clean, get_samples
 from tools.train_utils import *
 from pycocotools.coco import COCO

@@ -84,8 +84,8 @@ class FCOS_RT_R50VD_FPN_DCN_2x_Config(object):
 
         # 验证。用于train.py、eval.py、test_dev.py
         self.eval_cfg = dict(
-            model_path='aaaaaaaaaaaaa.pdparams',
-            # model_path='./weights/1000.pdparams',
+            # model_path='aaaaaaaaaaaaa.pdparams',
+            model_path='./weights/20000.pdparams',
             target_size=512,
             max_size=736,
             draw_image=False,    # 是否画出验证集图片
@@ -95,8 +95,8 @@ class FCOS_RT_R50VD_FPN_DCN_2x_Config(object):
 
         # 测试。用于demo.py
         self.test_cfg = dict(
-            model_path='aaaaaaaaaaaaa.pdparams',
-            # model_path='./weights/1000.pdparams',
+            # model_path='aaaaaaaaaaaaa.pdparams',
+            model_path='./weights/20000.pdparams',
             target_size=512,
             max_size=736,
             draw_image=True,
