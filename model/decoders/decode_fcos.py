@@ -7,15 +7,9 @@
 #   Description :
 #
 # ================================================================
-import random
 import colorsys
-import cv2
 import threading
-import os
 import paddle
-import paddle.nn.functional as F
-import paddle.fluid.layers as L
-import numpy as np
 
 from tools.transform import *
 

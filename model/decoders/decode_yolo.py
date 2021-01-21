@@ -3,28 +3,22 @@
 # ================================================================
 #
 #   Author      : miemie2013
-#   Created date: 2020-10-23 09:13:23
-#   Description : paddle2.0_ppyolo
+#   Created date:
+#   Description :
 #
 # ================================================================
-import random
 import colorsys
-import cv2
 import threading
-import os
 import paddle
-import paddle.nn.functional as F
-import paddle.fluid.layers as L
-import numpy as np
 
 from tools.transform import *
 
 
 class Decode_YOLO(object):
-    def __init__(self, _yolo, all_classes, place, cfg, for_test=True):
+    def __init__(self, model, all_classes, place, cfg, for_test=True):
         self.all_classes = all_classes
         self.num_classes = len(self.all_classes)
-        self._yolo = _yolo
+        self.model = model
         self.place = place
 
         # 图片预处理
@@ -144,7 +138,7 @@ class Decode_YOLO(object):
     def predict(self, image, im_size):
         image = paddle.to_tensor(image, place=self.place)
         im_size = paddle.to_tensor(im_size, place=self.place)
-        preds = self._yolo(image, im_size)
+        preds = self.model(image, im_size)
         preds = [pred.numpy() for pred in preds]
         return preds
 

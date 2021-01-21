@@ -20,7 +20,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def multi_thread_read(j, images, _decode, offset, eval_pre_path, batch_im_id, batch_im_name, batch_img, batch_pimage, batch_im_size):
+def multi_thread_read(j, images, _decode, offset, eval_pre_path, batch_im_id, batch_im_name, batch_img, batch_pimage, batch_im_info):
     im = images[offset + j]
     im_id = im['id']
     file_name = im['file_name']
@@ -28,9 +28,9 @@ def multi_thread_read(j, images, _decode, offset, eval_pre_path, batch_im_id, ba
     batch_im_id[j] = im_id
     batch_im_name[j] = file_name
     batch_img[j] = image
-    pimage, im_size = _decode.process_image(np.copy(image))
+    pimage, im_info = _decode.process_image(np.copy(image))
     batch_pimage[j] = pimage
-    batch_im_size[j] = im_size
+    batch_im_info[j] = im_info
 
 def read_eval_data(images,
                    _decode,
@@ -56,12 +56,12 @@ def read_eval_data(images,
         batch_im_name = [None] * batch_size
         batch_img = [None] * batch_size
         batch_pimage = [None] * batch_size
-        batch_im_size = [None] * batch_size
+        batch_im_info = [None] * batch_size
         threads = []
         offset = i * eval_batch_size
         for j in range(batch_size):
             t = threading.Thread(target=multi_thread_read,
-                                 args=(j, images, _decode, offset, eval_pre_path, batch_im_id, batch_im_name, batch_img, batch_pimage, batch_im_size))
+                                 args=(j, images, _decode, offset, eval_pre_path, batch_im_id, batch_im_name, batch_img, batch_pimage, batch_im_info))
             threads.append(t)
             t.start()
         # 等待所有线程任务结束。
@@ -69,13 +69,13 @@ def read_eval_data(images,
             t.join()
 
         batch_pimage = np.concatenate(batch_pimage, axis=0)
-        batch_im_size = np.concatenate(batch_im_size, axis=0)
+        batch_im_info = np.concatenate(batch_im_info, axis=0)
         dic = {}
         dic['batch_im_id'] = batch_im_id
         dic['batch_im_name'] = batch_im_name
         dic['batch_img'] = batch_img
         dic['batch_pimage'] = batch_pimage
-        dic['batch_im_size'] = batch_im_size
+        dic['batch_im_info'] = batch_im_info
         eval_dic['%.8d' % i] = dic
 
 
@@ -158,9 +158,9 @@ def eval(_decode, images, eval_pre_path, anno_file, eval_batch_size, _clsid2cati
         batch_im_name = dic['batch_im_name']
         batch_img = dic['batch_img']
         batch_pimage = dic['batch_pimage']
-        batch_im_size = dic['batch_im_size']
+        batch_im_info = dic['batch_im_info']
 
-        result_image, result_boxes, result_scores, result_classes = _decode.detect_batch(batch_img, batch_pimage, batch_im_size, draw_image=draw_image, draw_thresh=draw_thresh)
+        result_image, result_boxes, result_scores, result_classes = _decode.detect_batch(batch_img, batch_pimage, batch_im_info, draw_image=draw_image, draw_thresh=draw_thresh)
         batch_size = eval_batch_size
         if i == num_steps - 1:
             batch_size = n - (num_steps - 1) * eval_batch_size
