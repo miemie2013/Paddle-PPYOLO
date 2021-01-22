@@ -48,14 +48,19 @@ def read_test_data(path_dir,
         dic['im_size'] = im_size
         test_dic['%.8d' % k] = dic
 
-def save_img(filename, image):
-    cv2.imwrite('images/res/' + filename, image)
+def save_img(filename, fpn_images):
+    n_feat = len(fpn_images)
+    for i in range(n_feat):
+        image = fpn_images[i]
+        ss = filename.split('.')
+        filename2 = '%s_fpn_%d.jpg' % (ss[0], i)
+        cv2.imwrite('images/res/' + filename2, image)
 
 if __name__ == '__main__':
     parser = FCOSArgParser()
     use_gpu = parser.get_use_gpu()
     cfg = parser.get_cfg()
-    # cfg = FCOS_RT_R50_FPN_4x_Config()
+    cfg = FCOS_RT_R50_FPN_4x_Config()
     print(paddle.__version__)
     paddle.disable_static()   # 开启动态图
     gpu_id = int(os.environ.get('FLAGS_selected_gpus', 0))
@@ -142,7 +147,7 @@ if __name__ == '__main__':
         pimage = dic['pimage']
         im_size = dic['im_size']
 
-        image, boxes, scores, classes = _decode.detect_image(image, pimage, im_size, draw_image, draw_thresh)
+        fpn_images = _decode.get_heatmap(image, pimage, im_size, draw_image, draw_thresh)
 
         # 估计剩余时间
         start_time = end_time
@@ -154,7 +159,7 @@ if __name__ == '__main__':
 
         logger.info('Infer iter {}, num_imgs={}, eta={}.'.format(k, num_imgs, eta))
         if draw_image:
-            t2 = threading.Thread(target=save_img, args=(filename, image))
+            t2 = threading.Thread(target=save_img, args=(filename, fpn_images))
             t2.start()
             logger.info("Detection bbox results save in images/res/{}".format(filename))
     cost = time.time() - start

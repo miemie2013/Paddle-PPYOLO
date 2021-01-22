@@ -159,6 +159,11 @@ class FCOS_RT_R50_FPN_4x_Config(object):
         #     use_gaussian=False,
         #     gaussian_sigma=2.,
         # )
+        # self.nms_cfg = dict(
+        #     nms_type='no_nms',
+        #     score_threshold=0.025,
+        #     keep_top_k=100,
+        # )
         self.nms_cfg = dict(
             nms_type='multiclass_nms',
             score_threshold=0.025,

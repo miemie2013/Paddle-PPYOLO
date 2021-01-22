@@ -16,6 +16,7 @@ from paddle import fluid
 import paddle.fluid.layers as L
 
 from model.custom_layers import *
+from model.matrix_nms import *
 
 
 class FCOSHead(paddle.nn.Layer):
@@ -305,6 +306,62 @@ class FCOSHead(paddle.nn.Layer):
             box_cls_ch_last = box_cls_ch_last * box_iaw_ch_last
         return box_cls_ch_last, box_reg_decoding
 
+    def _postprocessing_by_level2(self, locations, box_cls, box_reg, box_ctn, box_iaw,
+                                 im_info):
+        """
+        Args:
+            locations (Variables): anchor points for current layer
+            box_cls   (Variables): categories prediction
+            box_reg   (Variables): bounding box prediction
+            box_ctn   (Variables): centerness prediction
+            im_info   (Variables): [h, w, scale] for input images
+        Return:
+            box_cls_ch_last  (Variables): score for each category, in [N, C, M]
+                C is the number of classes and M is the number of anchor points
+            box_reg_decoding (Variables): decoded bounding box, in [N, M, 4]
+                last dimension is [x1, y1, x2, y2]
+        """
+        batch_size = box_cls.shape[0]
+        num_classes = self.num_classes
+
+        # =========== 类别概率，[N, 80, H*W] ===========
+        box_cls_ch_last = L.reshape(box_cls, (batch_size, num_classes, -1))  # [N, 80, H*W]
+        box_cls_ch_last = L.sigmoid(box_cls_ch_last)  # 类别概率用sigmoid()激活，[N, 80, H*W]
+
+        # =========== 坐标(4个偏移)，[N, H*W, 4] ===========
+        box_reg_ch_last = L.transpose(box_reg, perm=[0, 2, 3, 1])  # [N, H, W, 4]
+        box_reg_ch_last = L.reshape(box_reg_ch_last, (batch_size, -1, 4))  # [N, H*W, 4]，坐标不用再接激活层，直接预测。
+
+        # =========== centerness，[N, 1, H*W] ===========
+        box_ctn_ch_last = L.reshape(box_ctn, (batch_size, 1, -1))  # [N, 1, H*W]
+        box_ctn_ch_last = L.sigmoid(box_ctn_ch_last)  # centerness用sigmoid()激活，[N, 1, H*W]
+
+        # =========== iou_aware，[N, 1, H*W] ===========
+        if self.iou_aware:
+            box_iaw_ch_last = L.reshape(box_iaw, (batch_size, 1, -1))  # [N, 1, H*W]
+            box_iaw_ch_last = L.sigmoid(box_iaw_ch_last)  # iou_aware用sigmoid()激活，[N, 1, H*W]
+
+        # box_reg_decoding = L.concat(  # [N, H*W, 4]
+        #     [
+        #         locations[:, 0:1] - box_reg_ch_last[:, :, 0:1],  # 左上角x坐标
+        #         locations[:, 1:2] - box_reg_ch_last[:, :, 1:2],  # 左上角y坐标
+        #         locations[:, 0:1] + box_reg_ch_last[:, :, 2:3],  # 右下角x坐标
+        #         locations[:, 1:2] + box_reg_ch_last[:, :, 3:4]  # 右下角y坐标
+        #     ],
+        #     axis=-1)
+        # # recover the location to original image
+        im_scale = im_info[0, 2]  # [1, ]
+        locations = locations / im_scale  # [H*W, 2]
+        box_reg_ch_last = box_reg_ch_last / im_scale  # [N, H*W, 4]
+        if self.thresh_with_ctr:
+            box_cls_ch_last = box_cls_ch_last * box_ctn_ch_last  # [N, 80, H*W]，最终分数=类别概率*centerness
+        if self.iou_aware:
+            # pow运算太慢，所以直接乘。
+            # box_cls_ch_last = L.pow(box_cls_ch_last, (1 - self.iou_aware_factor)) \
+            #                   * L.pow(box_iaw_ch_last, self.iou_aware_factor)
+            box_cls_ch_last = box_cls_ch_last * box_iaw_ch_last
+        return box_cls_ch_last, locations, box_reg_ch_last
+
     def _post_processing(self, locations, cls_logits, bboxes_reg, centerness, iou_awares,
                          im_info):
         """
@@ -344,7 +401,39 @@ class FCOSHead(paddle.nn.Layer):
             for i in range(batch_size):
                 pred = fluid.layers.multiclass_nms(pred_boxes[i:i+1, :, :], pred_scores[i:i+1, :, :], background_label=-1, **nms_cfg)
                 preds.append(pred)
+        elif nms_type == 'no_nms':
+            batch_size = pred_boxes.shape[0]
+            for i in range(batch_size):
+                pred = no_nms(pred_boxes[i, :, :], pred_scores[i, :, :], **nms_cfg)
+                preds.append(pred)
         return preds
+
+    def _post_processing2(self, locations, cls_logits, bboxes_reg, centerness, iou_awares,
+                         im_info):
+        """
+        Args:
+            locations   (list): List of Variables composed by center of each anchor point
+            cls_logits  (list): List of Variables for class prediction
+            bboxes_reg  (list): List of Variables for bounding box prediction
+            centerness  (list): List of Variables for centerness prediction
+            im_info(Variables): [h, w, scale] for input images
+        Return:
+            pred (LoDTensor): predicted bounding box after nms,
+                the shape is n x 6, last dimension is [label, score, xmin, ymin, xmax, ymax]
+        """
+        pred_loc_ = []
+        pred_ltrb_ = []
+        pred_scores_ = []
+        for _, (
+                pts, cls, box, ctn, iaw
+        ) in enumerate(zip(locations, cls_logits, bboxes_reg, centerness, iou_awares)):
+            pred_scores_lvl, locations, box_reg_ch_last = self._postprocessing_by_level2(
+                pts, cls, box, ctn, iaw, im_info)
+            N, C, H, W = cls.shape
+            pred_scores_.append(L.reshape(pred_scores_lvl, (N, -1, H, W)))   # [N, 80, H, W]，最终分数
+            pred_ltrb_.append(L.reshape(box_reg_ch_last, (N, H, W, 4)))     # [N, H, W, 4]
+            pred_loc_.append(L.reshape(locations, (N, H, W, 2)))     # [N, H, W, 2]
+        return pred_scores_, pred_ltrb_, pred_loc_
 
     def get_loss(self, input, tag_labels, tag_bboxes, tag_centerness):
         """
@@ -394,6 +483,29 @@ class FCOSHead(paddle.nn.Layer):
         preds = self._post_processing(locations, cls_logits, bboxes_reg,
                                      centerness, iou_awares, im_info)
         return preds
+
+    def get_heatmap(self, input, im_info):
+        """
+        Args:
+            input: [p7, p6, p5, p4, p3]
+            im_info(Variables): [h, w, scale] for input images
+        Return:
+            the bounding box prediction
+        """
+        # cls_logits里面每个元素是[N, 80, 格子行数, 格子列数]
+        # bboxes_reg里面每个元素是[N,  4, 格子行数, 格子列数]
+        # centerness里面每个元素是[N,  1, 格子行数, 格子列数]
+        # is_training=False表示验证状态。
+        # 验证状态的话，bbox_reg再乘以下采样倍率，这样得到的坐标是相对于输入图片宽高的坐标。
+        cls_logits, bboxes_reg, centerness, iou_awares = self._get_output(
+            input, is_training=False)
+
+        # locations里面每个元素是[格子行数*格子列数, 2]。即格子中心点相对于输入图片宽高的xy坐标。
+        locations = self._compute_locations(input)
+
+        pred_scores_, pred_ltrb_, pred_loc_ = self._post_processing2(locations, cls_logits, bboxes_reg,
+                                       centerness, iou_awares, im_info)
+        return pred_scores_, pred_ltrb_, pred_loc_
 
 
 

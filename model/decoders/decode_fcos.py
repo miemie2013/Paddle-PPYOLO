@@ -63,6 +63,100 @@ class Decode_FCOS(object):
             self.draw(image, boxes2, scores2, classes2)
         return image, boxes, scores, classes
 
+    # 处理一张图片
+    def get_heatmap(self, image, pimage, im_info, draw_image, draw_thresh=0.0):
+        pimage = paddle.to_tensor(pimage, place=self.place)
+        im_info = paddle.to_tensor(im_info, place=self.place)
+        pred_scores, pred_ltrb, pred_loc = self.model(pimage, im_info, get_heatmap=True)
+        pred_scores = [pred.numpy() for pred in pred_scores]
+        pred_ltrb = [pred.numpy() for pred in pred_ltrb]
+        pred_loc = [pred.numpy() for pred in pred_loc]
+
+        n_feat = len(pred_scores)
+        fpn_images = []
+        thr = 0.05
+        mask_alpha = 0.45
+        line_color = (0, 0, 0)
+        color = (0, 0, 255)
+        color = np.array(color).astype(np.float32)
+        color = np.reshape(color, (1, 1, 3))
+        line_thick = 1
+
+        # 图片放大好观察
+        scales = [1.0, 2.0, 5.0, 5.0, 10.0]
+        if n_feat == 3:
+            scales = [3.0, 7.0, 13.0]
+
+        image_h, image_w, _ = image.shape
+        for i in range(n_feat):
+            fpn_image = np.copy(image)
+
+            scale = scales[i]
+
+
+            fpn_image = cv2.resize(
+                fpn_image,
+                None,
+                None,
+                fx=scale,
+                fy=scale,
+                interpolation=1)
+
+
+            scores = pred_scores[i]
+            ltrb = pred_ltrb[i]
+            loc = pred_loc[i]
+            loc *= scale
+            ltrb *= scale
+
+            stride = loc[0, 0, 0, 0] * 2.0
+            # N, H, W, 4 = boxes.shape
+            N, C, H, W = scores.shape
+            for j in range(H):
+                for k in range(W):
+                    # 先画格子分界线。
+                    grid_rb_x = loc[0, j, k, 0] + stride * 0.5
+                    grid_rb_x = int(grid_rb_x)
+                    grid_rb_y = loc[0, j, k, 1] + stride * 0.5
+                    grid_rb_y = int(grid_rb_y)
+                    cv2.line(fpn_image, (grid_rb_x, int(grid_rb_y - stride)), (grid_rb_x, grid_rb_y), line_color, line_thick)
+                    cv2.line(fpn_image, (int(grid_rb_x - stride), grid_rb_y), (grid_rb_x, grid_rb_y), line_color, line_thick)
+
+                    _score = scores[0, :, j, k]   # [80, ]
+                    _ltrb  =   ltrb[0, j, k, :]   # [4, ]
+                    _loc   =    loc[0, j, k, :]   # [2, ]
+                    max_score = np.max(_score)
+                    if max_score < thr:
+                        continue
+                    else:
+                        pos = np.where(_score >= thr)[0]
+                        for p in pos:
+                            # 类别id + 分数 写上去
+                            bbox_mess = '%s: %.2f' % (self.all_classes[p], _score[p])
+                            left = _loc[0] - stride * 0.5
+                            top = _loc[1] - stride * 0.5
+                            right = _loc[0] + stride * 0.5
+                            bottom = _loc[1] + stride * 0.5
+
+                            left = int(left)
+                            top = int(top)
+                            right = int(right)
+                            bottom = int(bottom)
+
+                            cv2.putText(fpn_image, bbox_mess, (left, top+9), cv2.FONT_HERSHEY_SIMPLEX,
+                                        0.3, (0, 0, 0), 1, lineType=cv2.LINE_AA)
+
+                            # 画分数的热力图
+                            color2 = np.copy(color)
+                            color2 *= _score[p]
+                            target_region = fpn_image[top:bottom, left:right, :]
+                            target_ms = np.ones(target_region.shape, np.float32)
+                            target_region = target_ms * (target_region * (1 - mask_alpha) + color2 * mask_alpha) + (
+                                    1 - target_ms) * target_region
+                            fpn_image[top:bottom, left:right, :] = target_region
+            fpn_images.append(fpn_image)
+        return fpn_images
+
     # 多线程后处理
     def multi_thread_post(self, i, pred, result_image, result_boxes, result_scores, result_classes, batch_img, draw_image, draw_thresh):
         no_obj = False

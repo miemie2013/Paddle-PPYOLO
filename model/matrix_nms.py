@@ -244,3 +244,33 @@ def matrix_nms(bboxes,
 
 
 
+def no_nms(bboxes,
+           scores,
+           score_threshold,
+           keep_top_k):
+    scores = L.transpose(scores, [1, 0])
+    inds = L.where(scores > score_threshold)
+    if len(inds) == 0:
+        return L.zeros((0, 6), 'float32') - 1.0
+
+    cate_scores = L.gather_nd(scores, inds)
+    cate_labels = inds[:, 1]
+    bboxes = L.gather(bboxes, inds[:, 0])
+
+    # sort and keep top keep_top_k
+    _, sort_inds = L.argsort(cate_scores, descending=True)
+    if keep_top_k > 0 and len(sort_inds) > keep_top_k:
+        sort_inds = sort_inds[:keep_top_k]
+    bboxes = L.gather(bboxes, sort_inds)
+    cate_scores = L.gather(cate_scores, sort_inds)
+    cate_labels = L.gather(cate_labels, sort_inds)
+
+    cate_scores = L.unsqueeze(cate_scores, 1)
+    cate_labels = L.unsqueeze(cate_labels, 1)
+    cate_labels = L.cast(cate_labels, 'float32')
+    pred = L.concat([cate_labels, cate_scores, bboxes], 1)
+
+    return pred
+
+
+

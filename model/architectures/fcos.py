@@ -17,10 +17,13 @@ class FCOS(paddle.nn.Layer):
         self.fpn = fpn
         self.head = head
 
-    def forward(self, x, im_info):
+    def forward(self, x, im_info, get_heatmap=False):
         body_feats = self.backbone(x)
         body_feats, spatial_scale = self.fpn(body_feats)
-        out = self.head.get_prediction(body_feats, im_info)
+        if get_heatmap:
+            out = self.head.get_heatmap(body_feats, im_info)
+        else:
+            out = self.head.get_prediction(body_feats, im_info)
         return out
 
     def train_model(self, x, tag_labels, tag_bboxes, tag_centerness):
