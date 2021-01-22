@@ -2199,6 +2199,19 @@ class Gt2FCOSTargetSingle(BaseOperator):
             shift_x, shift_y = np.meshgrid(shift_x, shift_y)
             shift_x = shift_x.flatten()
             shift_y = shift_y.flatten()
+
+            '''
+            location.shape = [grid_h*grid_w, 2]
+            如果stride=8，
+            location = [[4, 4], [12, 4], [20, 4], ...],  这一个输出层的格子的中心点的xy坐标。格子顺序是第一行从左到右，第二行从左到右，...
+            即location = [[0.5*stride, 0.5*stride], [1.5*stride, 0.5*stride], [2.5*stride, 0.5*stride], ...]
+            
+            如果stride=16，
+            location = [[8, 8], [24, 8], [40, 8], ...],  这一个输出层的格子的中心点的xy坐标。格子顺序是第一行从左到右，第二行从左到右，...
+            即location = [[0.5*stride, 0.5*stride], [1.5*stride, 0.5*stride], [2.5*stride, 0.5*stride], ...]
+            
+            ...
+            '''
             location = np.stack([shift_x, shift_y], axis=1) + stride // 2
             locations.append(location)
         num_points_each_level = [len(location) for location in locations]   # num_points_each_level=[stride=8感受野格子数, ..., stride=128感受野格子数]
@@ -2231,10 +2244,12 @@ class Gt2FCOSTargetSingle(BaseOperator):
         """
         bboxes = np.reshape(   # [gt数, 4] -> [1, gt数, 4]
             gt_bbox, newshape=[1, gt_bbox.shape[0], gt_bbox.shape[1]])
-        bboxes = np.tile(bboxes, reps=[xs.shape[0], 1, 1])   # [所有格子数, gt数, 4]   gt坐标
+        bboxes = np.tile(bboxes, reps=[xs.shape[0], 1, 1])   # [所有格子数, gt数, 4]   gt坐标。可以看出，每1个gt都会参与到fpn的所有输出特征图。
         ct_x = (bboxes[:, :, 0] + bboxes[:, :, 2]) / 2       # [所有格子数, gt数]      gt中心点x
         ct_y = (bboxes[:, :, 1] + bboxes[:, :, 3]) / 2       # [所有格子数, gt数]      gt中心点y
         beg = 0   # 开始=0
+
+        # clipped_box即修改之后的gt，和原始gt（bboxes）的中心点相同，但是边长却修改成最大只能是1.5 * 2 = 3个格子边长
         clipped_box = bboxes.copy()   # [所有格子数, gt数, 4]   gt坐标，限制gt的边长，最大只能是1.5 * 2 = 3个格子边长
         for lvl, stride in enumerate(self.downsample_ratios):   # 遍历每个感受野，从 stride=8的感受野 到 stride=128的感受野
             end = beg + num_points_each_level[lvl]   # 结束=开始+这个感受野的格子数
@@ -2248,6 +2263,9 @@ class Gt2FCOSTargetSingle(BaseOperator):
             clipped_box[beg:end, :, 3] = np.minimum(
                 bboxes[beg:end, :, 3], ct_y[beg:end, :] + stride_exp)   # 限制gt的边长，最大只能是1.5 * 2 = 3个格子边长
             beg = end
+
+        # 如果格子中心点落在clipped_box代表的gt框内，那么这个格子就被选为候选正样本。
+
         # xs  [所有格子数, gt数]， 所有格子中心点的横坐标重复 gt数 次
         l_res = xs - clipped_box[:, :, 0]   # [所有格子数, gt数]  所有格子需要学习 gt数 个l
         r_res = clipped_box[:, :, 2] - xs   # [所有格子数, gt数]  所有格子需要学习 gt数 个r
@@ -2262,11 +2280,11 @@ class Gt2FCOSTargetSingle(BaseOperator):
             "object_sizes_of_interest', and 'downsample_ratios' should have same length."
 
         # im, gt_bbox, gt_class, gt_score = sample
-        im = sample['image']
-        im_info = sample['im_info']
-        bboxes = sample['gt_bbox']
-        gt_class = sample['gt_class']
-        gt_score = sample['gt_score']
+        im = sample['image']   # [3, pad_h, pad_w]
+        im_info = sample['im_info']  # [3, ]  分别是resize_h, resize_w, im_scale
+        bboxes = sample['gt_bbox']   # [m, 4]  x0y0x1y1格式
+        gt_class = sample['gt_class']   # [m, 1]
+        gt_score = sample['gt_score']   # [m, 1]
         no_gt = False
         if len(bboxes) == 0:   # 如果没有gt，虚构一个gt为了后面不报错。
             no_gt = True
@@ -2308,12 +2326,16 @@ class Gt2FCOSTargetSingle(BaseOperator):
             # [所有格子数, gt数]    True表示格子中心点（锚点）落在gt内（gt是被限制边长后的gt）。
             # FCOS首先将gt框内的锚点（格子中心点）视为候选正样本，然后根据为每个金字塔等级定义的比例范围从候选中选择最终的正样本（而且是负责预测gt里面积最小的），最后那些未选择的锚点为负样本。
             # (1)第1个正负样本判断依据
+
+            # 这里是使用gt的中心区域判断格子中心点是否在gt框内。这样做会减少很多中心度很低的低质量正样本。
             is_inside_box = self._check_inside_boxes_limited(
                 bboxes, xs, ys, num_points_each_level)
         else:
             # [所有格子数, gt数]    True表示格子中心点（锚点）落在gt内。
             # FCOS首先将gt框内的锚点（格子中心点）视为候选正样本，然后根据为每个金字塔等级定义的比例范围从候选中选择最终的正样本（而且是负责预测gt里面积最小的），最后那些未选择的锚点为负样本。
             # (1)第1个正负样本判断依据
+
+            # 这里是使用gt的完整区域判断格子中心点是否在gt框内。这样做会增加很多中心度很低的低质量正样本。
             is_inside_box = np.min(reg_targets, axis=2) > 0
         # check if the targets is inside the corresponding level
         max_reg_targets = np.max(reg_targets, axis=2)    # [所有格子数, gt数]   所有格子需要学习 gt数 个lrtb   中的最大值
