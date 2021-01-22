@@ -85,8 +85,8 @@ class FCOSHead(paddle.nn.Layer):
         for lvl in range(0, self.num_convs):
             use_dcn = lvl in self.dcn_v2_stages
             bias_attr = True
-            if not use_dcn_bias:
-                bias_attr = False
+            if use_dcn:
+                bias_attr = use_dcn_bias
 
             in_ch = self.in_channel
             # if self.coord_conv:
