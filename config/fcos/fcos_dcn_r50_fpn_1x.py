@@ -144,6 +144,7 @@ class FCOS_DCN_R50_FPN_1x_Config(object):
             use_dcn_in_tower=False,
 
             dcn_v2_stages=[0, 1, 2, 3],   # 可填[0, 1, 2, ..., num_convs-1]
+            use_dcn_bias=True,
         )
         self.fcos_loss_type = 'FCOSLoss'
         self.fcos_loss = dict(

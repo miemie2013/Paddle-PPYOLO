@@ -33,6 +33,7 @@ class FCOSHead(paddle.nn.Layer):
                  use_dcn_in_tower=False,
                  drop_block=False,
                  dcn_v2_stages=[],
+                 use_dcn_bias=False,
                  coord_conv=False,
                  spp=False,
                  iou_aware=False,
@@ -83,12 +84,15 @@ class FCOSHead(paddle.nn.Layer):
         # 每个fpn输出特征图  共享的  卷积层。
         for lvl in range(0, self.num_convs):
             use_dcn = lvl in self.dcn_v2_stages
+            bias_attr = True
+            if not use_dcn_bias:
+                bias_attr = False
 
             in_ch = self.in_channel
             # if self.coord_conv:
             #     in_ch = self.in_channel + 2 if lvl == 0 else self.in_channel
             in_ch = in_ch * 4 if self.use_spp and lvl == 1 else in_ch   # spp层暂定放在第一个卷积层之后
-            cls_conv_layer = Conv2dUnit(in_ch, self.in_channel, 3, stride=1, bias_attr=True, norm_type=norm_type, groups=32, bias_lr=2.0,
+            cls_conv_layer = Conv2dUnit(in_ch, self.in_channel, 3, stride=1, bias_attr=bias_attr, norm_type=norm_type, groups=32, bias_lr=2.0,
                                         weight_init=Normal(loc=0., scale=0.01), bias_init=Constant(0.0),
                                         act='relu', use_dcn=use_dcn, name='fcos_head_cls_tower_conv_{}'.format(lvl))
             self.cls_convs.append(cls_conv_layer)
@@ -98,7 +102,7 @@ class FCOSHead(paddle.nn.Layer):
             if self.coord_conv:
                 in_ch = self.in_channel + 2 if lvl == 0 else self.in_channel
             in_ch = in_ch * 4 if self.use_spp and lvl == 1 else in_ch   # spp层暂定放在第一个卷积层之后
-            reg_conv_layer = Conv2dUnit(in_ch, self.in_channel, 3, stride=1, bias_attr=True, norm_type=norm_type, groups=32, bias_lr=2.0,
+            reg_conv_layer = Conv2dUnit(in_ch, self.in_channel, 3, stride=1, bias_attr=bias_attr, norm_type=norm_type, groups=32, bias_lr=2.0,
                                         weight_init=Normal(loc=0., scale=0.01), bias_init=Constant(0.0),
                                         act='relu', use_dcn=use_dcn, name='fcos_head_reg_tower_conv_{}'.format(lvl))
             self.reg_convs.append(reg_conv_layer)
