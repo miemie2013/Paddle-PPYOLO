@@ -42,11 +42,13 @@ class SOLOv2_light_448_r50_fpn_8gpu_3x_Config(object):
             max_batch=2,     # 最大读多少个批
             model_path='dygraph_solov2_light_448_r50_fpn_8gpu_3x.pdparams',
             # model_path='./weights/1000.pdparams',
+            update_iter=1,    # 每隔几步更新一次参数
+            log_iter=20,      # 每隔几步打印一次
             save_iter=1000,   # 每隔几步保存一次模型
             eval_iter=30000,   # 每隔几步计算一次eval集的mAP
             max_iters=270000,   # 训练多少步
             mixup_epoch=10,     # 前几轮进行mixup
-            cutmix_epoch=-1,    # 前几轮进行cutmix
+            cutmix_epoch=10,    # 前几轮进行cutmix
         )
         self.learningRate = dict(
             base_lr=0.01,
@@ -76,6 +78,7 @@ class SOLOv2_light_448_r50_fpn_8gpu_3x_Config(object):
             model_path='dygraph_solov2_light_448_r50_fpn_8gpu_3x.pdparams',
             # model_path='./weights/1000.pdparams',
             target_size=448,
+            max_size=768,
             draw_image=False,    # 是否画出验证集图片
             draw_thresh=0.15,    # 如果draw_image==True，那么只画出分数超过draw_thresh的物体的预测框。
             eval_batch_size=1,   # 验证时的批大小。
@@ -86,7 +89,7 @@ class SOLOv2_light_448_r50_fpn_8gpu_3x_Config(object):
             model_path='dygraph_solov2_light_448_r50_fpn_8gpu_3x.pdparams',
             # model_path='./weights/1000.pdparams',
             target_size=448,
-            # target_size=320,
+            max_size=768,
             draw_image=True,
             draw_thresh=0.15,   # 如果draw_image==True，那么只画出分数超过draw_thresh的物体的预测框。
         )
