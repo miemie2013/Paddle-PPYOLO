@@ -23,4 +23,8 @@ from .fcos.fcos_rt_dla34_fpn_4x import *
 from .fcos.fcos_rt_r50vd_fpn_dcn_2x import *
 from .fcos.fcos_dcn_r50_fpn_1x import *
 
+from .solo.solov2_light_448_r50_fpn_8gpu_3x import *
+from .solo.solov2_light_r50_vd_fpn_dcn_512_3x import *
+from .solo.solov2_r50_fpn_8gpu_3x import *
+
 
