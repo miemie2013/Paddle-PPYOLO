@@ -741,6 +741,14 @@ class RandomCrop(BaseOperator):
                     else:
                         sample['gt_poly'] = crop_polys
                 sample['image'] = self._crop_image(sample['image'], crop_box)
+                # 掩码也被删去与裁剪
+                if 'gt_segm' in sample.keys() and sample['gt_segm'] is not None:
+                    gt_segm = sample['gt_segm']
+                    gt_segm = gt_segm.transpose(1, 2, 0)
+                    gt_segm = np.take(gt_segm, valid_ids, axis=-1)
+                    gt_segm = self._crop_image(gt_segm, crop_box)
+                    gt_segm = gt_segm.transpose(2, 0, 1)
+                    sample['gt_segm'] = gt_segm
                 sample['gt_bbox'] = np.take(cropped_box, valid_ids, axis=0)
                 sample['gt_class'] = np.take(
                     sample['gt_class'], valid_ids, axis=0)
@@ -1211,7 +1219,6 @@ class RandomFlipImage(BaseOperator):
                 if self.is_mask_flip and len(sample['gt_poly']) != 0:
                     sample['gt_poly'] = self.flip_segms(sample['gt_poly'],
                                                         height, width)
-
                 if 'gt_keypoint' in sample.keys():
                     sample['gt_keypoint'] = self.flip_keypoint(
                         sample['gt_keypoint'], width)
@@ -1219,6 +1226,9 @@ class RandomFlipImage(BaseOperator):
                 if 'semantic' in sample.keys() and sample[
                         'semantic'] is not None:
                     sample['semantic'] = sample['semantic'][:, ::-1]
+
+                if 'gt_segm' in sample.keys() and sample['gt_segm'] is not None:
+                    sample['gt_segm'] = sample['gt_segm'][:, :, ::-1]
 
                 sample['flipped'] = True
                 sample['image'] = im
@@ -2404,6 +2414,169 @@ class Gt2FCOSTargetSingle(BaseOperator):
             sample['centerness{}'.format(lvl)] = np.reshape(
                 ctn_targets_by_level[lvl], newshape=[grid_h, grid_w, 1])     # reshape成[grid_h, grid_w, 1]
         return sample
+
+
+class Gt2Solov2Target(BaseOperator):
+    """Assign mask target and labels in SOLOv2 network.
+    Args:
+        num_grids (list): The list of feature map grids size.
+        scale_ranges (list): The list of mask boundary range.
+        coord_sigma (float): The coefficient of coordinate area length.
+        sampling_ratio (float): The ratio of down sampling.
+    """
+
+    def __init__(self,
+                 num_grids=[40, 36, 24, 16, 12],
+                 scale_ranges=[[1, 96], [48, 192], [96, 384], [192, 768],
+                               [384, 2048]],
+                 coord_sigma=0.2,
+                 sampling_ratio=4.0):
+        super(Gt2Solov2Target, self).__init__()
+        self.num_grids = num_grids
+        self.scale_ranges = scale_ranges
+        self.coord_sigma = coord_sigma
+        self.sampling_ratio = sampling_ratio
+
+    def _scale_size(self, im, scale):
+        h, w = im.shape[:2]
+        new_size = (int(w * float(scale) + 0.5), int(h * float(scale) + 0.5))
+        resized_img = cv2.resize(
+            im, None, None, fx=scale, fy=scale, interpolation=cv2.INTER_LINEAR)
+        return resized_img
+
+    def __call__(self, samples, context=None):
+        '''
+        SOLOv2算法其实非常复杂。复杂的地方有2：一是正样本的分配（预处理），二是后处理。即使是咩酱也被该算法绕晕了。梳理一下正样本的分配：
+
+        遍历每张图片->
+            遍历5个输出层->
+                若某些gt的平均边长落在这一层的边界范围内时，这一层负责预测这些gt；
+                遍历这些gt->
+                    本gt可被多个格子（该层最多9个）预测。负责预测gt的格子叫正样本，一个gt可对应多个（该层最多9个）正样本。
+                    遍历负责预测本gt的格子->
+                        填写掩码、类别id、ins_ind_label正样本处为True等等。
+
+        有了多个for循环嵌套，非常容易绕晕。原版SOLO仓库中的该部分代码也是非常难读的。
+        :param samples:
+        :param context:
+        :return:
+        '''
+        sample_id = 0
+        for sample in samples:
+            gt_bboxes_raw = sample['gt_bbox']
+            gt_labels_raw = sample['gt_class']
+
+            # 改动PaddleDetection中Gt2Solov2Target的地方。
+            # 类别id需要加1。类别id取值范围是[0, 80]共81个值。类别id是0时表示的是背景。这里是正样本的类别id，肯定大于0
+            gt_labels_raw = gt_labels_raw + 1
+
+            im_c, im_h, im_w = sample['image'].shape[:]
+            gt_masks_raw = sample['gt_segm'].astype(np.uint8)
+            mask_feat_size = [
+                int(im_h / self.sampling_ratio), int(im_w / self.sampling_ratio)
+            ]
+            gt_areas = np.sqrt((gt_bboxes_raw[:, 2] - gt_bboxes_raw[:, 0]) *
+                               (gt_bboxes_raw[:, 3] - gt_bboxes_raw[:, 1]))   # 每个gt框的平均边长
+            ins_ind_label_list = []
+            idx = 0
+            for (lower_bound, upper_bound), num_grid \
+                    in zip(self.scale_ranges, self.num_grids):   # 遍历每一层的边界范围，每列（每行）的格子数
+
+                hit_indices = ((gt_areas >= lower_bound) &
+                               (gt_areas <= upper_bound)).nonzero()[0]   # 若某些gt的平均边长落在这一层的边界范围内时，这一层负责预测这些gt
+                num_ins = len(hit_indices)   # 这一层负责预测的gt数
+
+                ins_label = []   # 用来装 正样本的掩码。里面每个元素的shape=[input_h/4, input_w/4]。最终形态是[m2, input_h/4, input_w/4]。 不同图片的该层的grid_order的m2很大概率是不同的。
+                grid_order = []  # 里面每个元素的shape=[1, ]。用来装 正样本在ins_ind_label中的下标。最终形态是[m2, 1]。 不同图片的该层的grid_order的m2很大概率是不同的。
+                cate_label = np.zeros([num_grid, num_grid], dtype=np.int64)   # [num_grid, num_grid]   正样本处填正样本的类别id
+                ins_ind_label = np.zeros([num_grid**2], dtype=np.bool)        # [num_grid*num_grid, ]  正样本处填True
+
+                if num_ins == 0:   # 这一层没有正样本
+                    ins_label = np.zeros(
+                        [1, mask_feat_size[0], mask_feat_size[1]],
+                        dtype=np.uint8)
+                    ins_ind_label_list.append(ins_ind_label)
+                    sample['cate_label{}'.format(idx)] = cate_label.flatten()
+                    sample['ins_label{}'.format(idx)] = ins_label
+                    sample['grid_order{}'.format(idx)] = np.asarray(
+                        [sample_id * num_grid * num_grid + 0])
+                    idx += 1
+                    continue
+                gt_bboxes = gt_bboxes_raw[hit_indices]   # shape=[m, 4]  这一层负责预测的物体的bbox
+                gt_labels = gt_labels_raw[hit_indices]   # shape=[m, 1]   这一层负责预测的物体的类别id
+                gt_masks = gt_masks_raw[hit_indices, ...]   # [m, ?, ?]
+
+                half_ws = 0.5 * (
+                    gt_bboxes[:, 2] - gt_bboxes[:, 0]) * self.coord_sigma   # shape=[m, ]  宽的一半
+                half_hs = 0.5 * (
+                    gt_bboxes[:, 3] - gt_bboxes[:, 1]) * self.coord_sigma   # shape=[m, ]  高的一半
+
+                # 遍历这一层负责预测的m个gt 的 gt_masks, gt_labels, half_hs, half_ws
+                for seg_mask, gt_label, half_h, half_w in zip(
+                        gt_masks, gt_labels, half_hs, half_ws):
+                    if seg_mask.sum() == 0:
+                        continue
+                    # mass center
+                    upsampled_size = (mask_feat_size[0] * 4, mask_feat_size[1] * 4)       # 也就是输入图片的大小
+                    center_h, center_w = ndimage.measurements.center_of_mass(seg_mask)    # 求物体掩码的质心。scipy提供技术支持。
+                    coord_w = int((center_w / upsampled_size[1]) // (1. / num_grid))      # 物体质心落在了第几列格子
+                    coord_h = int((center_h / upsampled_size[0]) // (1. / num_grid))      # 物体质心落在了第几行格子
+
+                    # left, top, right, down
+                    top_box = max(0, int(((center_h - half_h) / upsampled_size[0]) // (1. / num_grid)))   # 物体左上角落在了第几行格子
+                    down_box = min(num_grid - 1, int(((center_h + half_h) / upsampled_size[0]) // (1. / num_grid)))   # 物体右下角落在了第几行格子
+                    left_box = max(0, int(((center_w - half_w) / upsampled_size[1]) // (1. / num_grid)))    # 物体左上角落在了第几列格子
+                    right_box = min(num_grid - 1, int(((center_w + half_w) / upsampled_size[1]) // (1. / num_grid)))   # 物体右下角落在了第几列格子
+
+                    # 物体的宽高并没有那么重要。将物体的左上角、右下角限制在质心所在的九宫格内。当物体很小时，物体的左上角、右下角、质心位于同一个格子。
+                    top = max(top_box, coord_h - 1)
+                    down = min(down_box, coord_h + 1)
+                    left = max(coord_w - 1, left_box)
+                    right = min(right_box, coord_w + 1)
+
+                    # 40x40的网格，将负责预测gt的格子填上gt_label。一个gt可被多个格子（该层最多9个）预测。负责预测gt的格子叫正样本，一个gt可对应多个（该层最多9个）正样本。
+                    cate_label[top:(down + 1), left:(right + 1)] = gt_label
+                    seg_mask = self._scale_size(seg_mask, scale=1. / self.sampling_ratio)   # 该gt的掩码下采样4倍。
+                    # 遍历负责预测本gt的格子
+                    for i in range(top, down + 1):
+                        for j in range(left, right + 1):
+                            label = int(i * num_grid + j)   # 正样本在 ins_ind_label (shape=[num_grid*num_grid, ]) 中的下标
+                            ins_ind_label[label] = True   # ins_ind_label (shape=[num_grid*num_grid, ]) 的正样本处填上True
+                            cur_ins_label = np.zeros(
+                                [mask_feat_size[0], mask_feat_size[1]],
+                                dtype=np.uint8)   # [input_h/4, input_w/4]  正样本的掩码。
+                            cur_ins_label[:seg_mask.shape[0], :seg_mask.shape[
+                                1]] = seg_mask   # [input_h/4, input_w/4]  正样本的掩码。
+                            ins_label.append(cur_ins_label)
+                            # ins_label加入的掩码是属于第几个格子的掩码。由于不同图片本层的grid_order会无差别地拼接起来。所以加上图片的偏移。
+                            grid_order.append([sample_id * num_grid * num_grid + label])
+                if ins_label == []:
+                    ins_label = np.zeros(
+                        [1, mask_feat_size[0], mask_feat_size[1]],
+                        dtype=np.uint8)
+                    ins_ind_label_list.append(ins_ind_label)
+                    sample['cate_label{}'.format(idx)] = cate_label.flatten()   # [num_grid*num_grid, ]   正样本处填正样本的类别id
+                    sample['ins_label{}'.format(idx)] = ins_label
+                    sample['grid_order{}'.format(idx)] = np.asarray(
+                        [sample_id * num_grid * num_grid + 0])
+                else:
+                    ins_label = np.stack(ins_label, axis=0)
+                    ins_ind_label_list.append(ins_ind_label)
+                    sample['cate_label{}'.format(idx)] = cate_label.flatten()   # [num_grid*num_grid, ]   正样本处填正样本的类别id
+                    sample['ins_label{}'.format(idx)] = ins_label    # [m2, input_h/4, input_w/4]   正样本的掩码。
+                    sample['grid_order{}'.format(idx)] = np.asarray(grid_order)   # [m2, 1]
+                    assert len(grid_order) > 0
+                idx += 1
+            ins_ind_labels = np.concatenate([
+                ins_ind_labels_level_img
+                for ins_ind_labels_level_img in ins_ind_label_list
+            ])
+            fg_num = np.sum(ins_ind_labels)
+            sample['fg_num'] = fg_num   # 本图片全部输出层的正样本个数
+            sample_id += 1
+
+        return samples
+
 
 
 
