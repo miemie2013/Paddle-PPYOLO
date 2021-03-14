@@ -37,37 +37,6 @@ def multi_thread_op(i, num_threads, batch_size, samples, context, with_mixup, sa
             else:
                 samples[k] = sample_transform(samples[k], context)
 
-def multi_thread_op_batch_transforms(i, num_threads, batch_size, samples, context, batch_transforms, max_shape,
-                    batch_images, batch_labels0, batch_reg_target0, batch_centerness0, batch_labels1, batch_reg_target1, batch_centerness1,
-                    batch_labels2, batch_reg_target2, batch_centerness2, batch_labels3, batch_reg_target3, batch_centerness3,
-                    batch_labels4, batch_reg_target4, batch_centerness4, n_layers):
-    for k in range(i, batch_size, num_threads):
-        for batch_transform in batch_transforms:
-            if isinstance(batch_transform, PadBatchSingle):
-                samples[k] = batch_transform(max_shape, samples[k], context)
-            else:
-                samples[k] = batch_transform(samples[k], context)
-
-        # 整理成ndarray
-        batch_images[k] = np.expand_dims(samples[k]['image'].astype(np.float32), 0)
-        batch_labels0[k] = np.expand_dims(samples[k]['labels0'].astype(np.int32), 0)
-        batch_reg_target0[k] = np.expand_dims(samples[k]['reg_target0'].astype(np.float32), 0)
-        batch_centerness0[k] = np.expand_dims(samples[k]['centerness0'].astype(np.float32), 0)
-        batch_labels1[k] = np.expand_dims(samples[k]['labels1'].astype(np.int32), 0)
-        batch_reg_target1[k] = np.expand_dims(samples[k]['reg_target1'].astype(np.float32), 0)
-        batch_centerness1[k] = np.expand_dims(samples[k]['centerness1'].astype(np.float32), 0)
-        batch_labels2[k] = np.expand_dims(samples[k]['labels2'].astype(np.int32), 0)
-        batch_reg_target2[k] = np.expand_dims(samples[k]['reg_target2'].astype(np.float32), 0)
-        batch_centerness2[k] = np.expand_dims(samples[k]['centerness2'].astype(np.float32), 0)
-        if n_layers == 5:
-            batch_labels3[k] = np.expand_dims(samples[k]['labels3'].astype(np.int32), 0)
-            batch_reg_target3[k] = np.expand_dims(samples[k]['reg_target3'].astype(np.float32), 0)
-            batch_centerness3[k] = np.expand_dims(samples[k]['centerness3'].astype(np.float32), 0)
-            batch_labels4[k] = np.expand_dims(samples[k]['labels4'].astype(np.int32), 0)
-            batch_reg_target4[k] = np.expand_dims(samples[k]['reg_target4'].astype(np.float32), 0)
-            batch_centerness4[k] = np.expand_dims(samples[k]['centerness4'].astype(np.float32), 0)
-
-
 def read_train_data(cfg,
                     train_indexes,
                     train_steps,
@@ -94,22 +63,15 @@ def read_train_data(cfg,
                 key_len = len(key_list)
 
             # ==================== train ====================
-            batch_images = [None] * batch_size
-            batch_labels0 = [None] * batch_size
-            batch_reg_target0 = [None] * batch_size
-            batch_centerness0 = [None] * batch_size
-            batch_labels1 = [None] * batch_size
-            batch_reg_target1 = [None] * batch_size
-            batch_centerness1 = [None] * batch_size
-            batch_labels2 = [None] * batch_size
-            batch_reg_target2 = [None] * batch_size
-            batch_centerness2 = [None] * batch_size
-            batch_labels3 = [None] * batch_size
-            batch_reg_target3 = [None] * batch_size
-            batch_centerness3 = [None] * batch_size
-            batch_labels4 = [None] * batch_size
-            batch_reg_target4 = [None] * batch_size
-            batch_centerness4 = [None] * batch_size
+            images = [None] * batch_size
+            fg_nums = [None] * batch_size
+            ins_labels = [None] * n_layers
+            cate_labels = [None] * n_layers
+            grid_orders = [None] * n_layers
+            for idx in range(n_layers):
+                ins_labels[idx] = [None] * batch_size
+                cate_labels[idx] = [None] * batch_size
+                grid_orders[idx] = [None] * batch_size
 
 
             samples = get_samples(train_records, train_indexes, step, batch_size, iter_id,
@@ -124,82 +86,51 @@ def read_train_data(cfg,
             for t in threads:
                 t.join()
 
-            # batch_transforms。需要先同步PadBatch
-            coarsest_stride = cfg.padBatch['pad_to_stride']
-            max_shape = np.array([data['image'].shape for data in samples]).max(
-                axis=0)  # max_shape=[3, max_h, max_w]
-            max_shape[1] = int(  # max_h增加到最小的能被coarsest_stride=128整除的数
-                np.ceil(max_shape[1] / coarsest_stride) * coarsest_stride)
-            max_shape[2] = int(  # max_w增加到最小的能被coarsest_stride=128整除的数
-                np.ceil(max_shape[2] / coarsest_stride) * coarsest_stride)
-
-            threads = []
-            for i in range(num_threads):
-                t = threading.Thread(target=multi_thread_op_batch_transforms, args=(i, num_threads, batch_size, samples, context, batch_transforms, max_shape,
-                                                                   batch_images, batch_labels0, batch_reg_target0, batch_centerness0, batch_labels1, batch_reg_target1, batch_centerness1,
-                                                                   batch_labels2, batch_reg_target2, batch_centerness2, batch_labels3, batch_reg_target3, batch_centerness3,
-                                                                   batch_labels4, batch_reg_target4, batch_centerness4, n_layers))
-                threads.append(t)
-                t.start()
-            # 等待所有线程任务结束。
-            for t in threads:
-                t.join()
+            # batch_transforms
+            for batch_transform in batch_transforms:
+                samples = batch_transform(samples, context)
 
             # 整理成ndarray
-            batch_images = np.concatenate(batch_images, 0)
-            batch_labels0 = np.concatenate(batch_labels0, 0)
-            batch_reg_target0 = np.concatenate(batch_reg_target0, 0)
-            batch_centerness0 = np.concatenate(batch_centerness0, 0)
-            batch_labels1 = np.concatenate(batch_labels1, 0)
-            batch_reg_target1 = np.concatenate(batch_reg_target1, 0)
-            batch_centerness1 = np.concatenate(batch_centerness1, 0)
-            batch_labels2 = np.concatenate(batch_labels2, 0)
-            batch_reg_target2 = np.concatenate(batch_reg_target2, 0)
-            batch_centerness2 = np.concatenate(batch_centerness2, 0)
-            if n_layers == 5:
-                batch_labels3 = np.concatenate(batch_labels3, 0)
-                batch_reg_target3 = np.concatenate(batch_reg_target3, 0)
-                batch_centerness3 = np.concatenate(batch_centerness3, 0)
-                batch_labels4 = np.concatenate(batch_labels4, 0)
-                batch_reg_target4 = np.concatenate(batch_reg_target4, 0)
-                batch_centerness4 = np.concatenate(batch_centerness4, 0)
+            for k in range(batch_size):
+                images[k] = np.expand_dims(samples[k]['image'].astype(np.float32), 0)
+                fg_nums[k] = np.expand_dims(samples[k]['fg_num'].astype(np.int32), 0)
+                for idx in range(n_layers):
+                    ins_labels[idx][k] = samples[k]['ins_label%d'%idx].astype(np.int32)
+                    cate_labels[idx][k] = samples[k]['cate_label%d'%idx].astype(np.int32)
+                    grid_orders[idx][k] = np.reshape(samples[k]['grid_order%d'%idx].astype(np.int32), (-1, ))
 
-            batch_images = paddle.to_tensor(batch_images, place=place)
-            batch_labels0 = paddle.to_tensor(batch_labels0, place=place)
-            batch_reg_target0 = paddle.to_tensor(batch_reg_target0, place=place)
-            batch_centerness0 = paddle.to_tensor(batch_centerness0, place=place)
-            batch_labels1 = paddle.to_tensor(batch_labels1, place=place)
-            batch_reg_target1 = paddle.to_tensor(batch_reg_target1, place=place)
-            batch_centerness1 = paddle.to_tensor(batch_centerness1, place=place)
-            batch_labels2 = paddle.to_tensor(batch_labels2, place=place)
-            batch_reg_target2 = paddle.to_tensor(batch_reg_target2, place=place)
-            batch_centerness2 = paddle.to_tensor(batch_centerness2, place=place)
-            if n_layers == 5:
-                batch_labels3 = paddle.to_tensor(batch_labels3, place=place)
-                batch_reg_target3 = paddle.to_tensor(batch_reg_target3, place=place)
-                batch_centerness3 = paddle.to_tensor(batch_centerness3, place=place)
-                batch_labels4 = paddle.to_tensor(batch_labels4, place=place)
-                batch_reg_target4 = paddle.to_tensor(batch_reg_target4, place=place)
-                batch_centerness4 = paddle.to_tensor(batch_centerness4, place=place)
+            # lod信息
+            # lods = [None] * n_layers
+            # for idx in range(n_layers):
+            #     lod = [0]
+            #     for k in range(batch_size):
+            #         l = len(grid_orders[idx][k])
+            #         lod.append(l)
+            #     lods[idx] = lod
+            # lods = np.array(lods).astype(np.int32)
+            # lods = np.cumsum(lods, axis=1)
+
+            images = np.concatenate(images, 0)
+            fg_nums = np.concatenate(fg_nums, 0)
+            for idx in range(n_layers):
+                ins_labels[idx] = np.concatenate(ins_labels[idx], 0)
+                cate_labels[idx] = np.concatenate(cate_labels[idx], 0)
+                grid_orders[idx] = np.concatenate(grid_orders[idx], 0)
+
+            images = paddle.to_tensor(images, place=place)
+            fg_nums = paddle.to_tensor(fg_nums, place=place)
+            for idx in range(n_layers):
+                ins_labels[idx] = paddle.to_tensor(ins_labels[idx], place=place)
+                cate_labels[idx] = paddle.to_tensor(cate_labels[idx], place=place)
+                grid_orders[idx] = paddle.to_tensor(grid_orders[idx], place=place)
 
             dic = {}
-            dic['batch_images'] = batch_images
-            dic['batch_labels0'] = batch_labels0
-            dic['batch_reg_target0'] = batch_reg_target0
-            dic['batch_centerness0'] = batch_centerness0
-            dic['batch_labels1'] = batch_labels1
-            dic['batch_reg_target1'] = batch_reg_target1
-            dic['batch_centerness1'] = batch_centerness1
-            dic['batch_labels2'] = batch_labels2
-            dic['batch_reg_target2'] = batch_reg_target2
-            dic['batch_centerness2'] = batch_centerness2
-            if n_layers == 5:
-                dic['batch_labels3'] = batch_labels3
-                dic['batch_reg_target3'] = batch_reg_target3
-                dic['batch_centerness3'] = batch_centerness3
-                dic['batch_labels4'] = batch_labels4
-                dic['batch_reg_target4'] = batch_reg_target4
-                dic['batch_centerness4'] = batch_centerness4
+            dic['images'] = images
+            dic['fg_nums'] = fg_nums
+            for idx in range(n_layers):
+                dic['ins_label%d'%idx] = ins_labels[idx]
+                dic['cate_label%d'%idx] = cate_labels[idx]
+                dic['grid_order%d'%idx] = grid_orders[idx]
             train_dic['%.8d'%iter_id] = dic
 
             # ==================== exit ====================
@@ -428,33 +359,18 @@ if __name__ == '__main__':
             eta = str(datetime.timedelta(seconds=int(eta_sec)))
 
             # ==================== train ====================
-            batch_images = dic['batch_images']
-            batch_labels0 = dic['batch_labels0']
-            batch_reg_target0 = dic['batch_reg_target0']
-            batch_centerness0 = dic['batch_centerness0']
-            batch_labels1 = dic['batch_labels1']
-            batch_reg_target1 = dic['batch_reg_target1']
-            batch_centerness1 = dic['batch_centerness1']
-            batch_labels2 = dic['batch_labels2']
-            batch_reg_target2 = dic['batch_reg_target2']
-            batch_centerness2 = dic['batch_centerness2']
-            if n_layers == 5:
-                batch_labels3 = dic['batch_labels3']
-                batch_reg_target3 = dic['batch_reg_target3']
-                batch_centerness3 = dic['batch_centerness3']
-                batch_labels4 = dic['batch_labels4']
-                batch_reg_target4 = dic['batch_reg_target4']
-                batch_centerness4 = dic['batch_centerness4']
-            if n_layers == 3:
-                tag_labels = [batch_labels0, batch_labels1, batch_labels2]
-                tag_bboxes = [batch_reg_target0, batch_reg_target1, batch_reg_target2]
-                tag_center = [batch_centerness0, batch_centerness1, batch_centerness2]
-            elif n_layers == 5:
-                tag_labels = [batch_labels0, batch_labels1, batch_labels2, batch_labels3, batch_labels4]
-                tag_bboxes = [batch_reg_target0, batch_reg_target1, batch_reg_target2, batch_reg_target3, batch_reg_target4]
-                tag_center = [batch_centerness0, batch_centerness1, batch_centerness2, batch_centerness3, batch_centerness4]
+            images = dic['images']
+            fg_nums = dic['fg_nums']
+            ins_labels = [None] * n_layers
+            cate_labels = [None] * n_layers
+            grid_orders = [None] * n_layers
 
-            losses = model.train_model(batch_images, tag_labels, tag_bboxes, tag_center)
+            for idx in range(n_layers):
+                ins_labels[idx] = dic['ins_label%d'%idx]
+                cate_labels[idx] = dic['cate_label%d'%idx]
+                grid_orders[idx] = dic['grid_order%d'%idx]
+
+            losses = model.train_model(images, ins_labels, cate_labels, grid_orders, fg_nums)
             all_loss = 0.0
             loss_names = {}
             for loss_name in losses.keys():
@@ -505,14 +421,16 @@ if __name__ == '__main__':
                     ema.apply()
                 model.eval()   # 切换到验证模式
                 head.set_dropblock(is_test=True)
-                box_ap = eval(_decode, val_images, cfg.val_pre_path, cfg.val_path, cfg.eval_cfg['eval_batch_size'], _clsid2catid, cfg.eval_cfg['draw_image'], cfg.eval_cfg['draw_thresh'])
+                box_ap, mask_ap = eval(_decode, val_images, cfg.val_pre_path, cfg.val_path, cfg.eval_cfg['eval_batch_size'], _clsid2catid, cfg.eval_cfg['draw_image'], cfg.eval_cfg['draw_thresh'])
                 logger.info("box ap: %.3f" % (box_ap[0], ))
+                logger.info("mask ap: %.3f" % (mask_ap[0],))
                 model.train()  # 切换到训练模式
                 backbone.fix_bn()  # model.train()后需要重新固定backbone的bn层。
                 head.set_dropblock(is_test=False)
 
-                # 以box_ap作为标准
-                ap = box_ap
+                # 以mask_ap作为标准
+                ap = mask_ap
+                write(log_filename, 'Evaluate annotation type *bbox*')
                 write(log_filename, 'Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = %.3f' % (box_ap[0], ))
                 write(log_filename, 'Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = %.3f' % (box_ap[1], ))
                 write(log_filename, 'Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = %.3f' % (box_ap[2], ))
@@ -525,6 +443,19 @@ if __name__ == '__main__':
                 write(log_filename, 'Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = %.3f' % (box_ap[9], ))
                 write(log_filename, 'Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = %.3f' % (box_ap[10], ))
                 write(log_filename, 'Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = %.3f' % (box_ap[11], ))
+                write(log_filename, 'Evaluate annotation type *segm*')
+                write(log_filename, 'Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = %.3f' % (mask_ap[0], ))
+                write(log_filename, 'Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = %.3f' % (mask_ap[1], ))
+                write(log_filename, 'Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = %.3f' % (mask_ap[2], ))
+                write(log_filename, 'Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = %.3f' % (mask_ap[3], ))
+                write(log_filename, 'Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = %.3f' % (mask_ap[4], ))
+                write(log_filename, 'Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = %.3f' % (mask_ap[5], ))
+                write(log_filename, 'Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = %.3f' % (mask_ap[6], ))
+                write(log_filename, 'Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = %.3f' % (mask_ap[7], ))
+                write(log_filename, 'Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = %.3f' % (mask_ap[8], ))
+                write(log_filename, 'Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = %.3f' % (mask_ap[9], ))
+                write(log_filename, 'Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = %.3f' % (mask_ap[10], ))
+                write(log_filename, 'Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = %.3f' % (mask_ap[11], ))
                 if ap[0] > best_ap_list[0]:
                     best_ap_list[0] = ap[0]
                     best_ap_list[1] = iter_id

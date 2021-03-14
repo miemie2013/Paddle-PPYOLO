@@ -99,6 +99,7 @@ class SOLOv2_light_448_r50_fpn_8gpu_3x_Config(object):
         # self.use_ema = True
         self.use_ema = False
         self.ema_decay = 0.9998
+        self.ema_iter = 1
         self.backbone_type = 'Resnet50Vb'
         self.backbone = dict(
             norm_type='bn',

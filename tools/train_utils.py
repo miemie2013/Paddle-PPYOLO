@@ -125,7 +125,7 @@ def get_transforms(cfg):
         elif preprocess_name == 'gt2YoloTarget':
             preprocess = Gt2YoloTargetSingle(**cfg.gt2YoloTarget)   # 填写target张量。
         elif preprocess_name == 'padBatchSingle':
-            use_padded_im_info = cfg.padBatchSingle['use_padded_im_info'] if 'use_padded_im_info' in cfg.padBatchSingle else None
+            use_padded_im_info = cfg.padBatchSingle['use_padded_im_info'] if 'use_padded_im_info' in cfg.padBatchSingle else True
             preprocess = PadBatchSingle(use_padded_im_info=use_padded_im_info)   # 填充黑边。使这一批图片有相同的大小。
         elif preprocess_name == 'padBatch':
             preprocess = PadBatch(**cfg.padBatch)                         # 填充黑边。使这一批图片有相同的大小。
