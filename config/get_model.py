@@ -17,11 +17,14 @@ from model.backbones.fpn import *
 from model.anchor_heads.yolov3_head import *
 from model.anchor_heads.yolov4_head import *
 from model.anchor_heads.fcos_head import *
+from model.anchor_heads.maskfeat_head import *
+from model.anchor_heads.solov2_head import *
 
 from model.losses.yolov3_loss import *
 from model.losses.my_loss import *
 from model.losses.iou_losses import *
 from model.losses.fcos_loss import *
+from model.losses.solov2_loss import *
 
 
 def select_backbone(name):
@@ -45,6 +48,10 @@ def select_head(name):
         return YOLOv4Head
     if name == 'FCOSHead':
         return FCOSHead
+    if name == 'SOLOv2Head':
+        return SOLOv2Head
+    if name == 'MaskFeatHead':
+        return MaskFeatHead
 
 def select_fpn(name):
     if name == 'FPN':
@@ -61,6 +68,8 @@ def select_loss(name):
         return MyLoss
     if name == 'FCOSLoss':
         return FCOSLoss
+    if name == 'SOLOv2Loss':
+        return SOLOv2Loss
 
 def select_regularization(name):
     if name == 'L1Decay':
