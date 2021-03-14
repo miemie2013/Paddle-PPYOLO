@@ -38,6 +38,7 @@ rm -f solov2_r50_fpn_3x.pdparams
 nvidia-smi
 cd ~
 pip install pycocotools
+pip install shapely
 cd data
 cd data7122
 unzip ann*.zip
