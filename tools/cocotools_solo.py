@@ -136,10 +136,12 @@ def eval(_decode, images, eval_pre_path, anno_file, eval_batch_size, _clsid2cati
 
     # 8G内存的电脑并不能装下所有结果，所以把结果写进文件里。
     if os.path.exists('%s/bbox/' % result_dir): shutil.rmtree('%s/bbox/' % result_dir)
+    if os.path.exists('%s/mask/' % result_dir): shutil.rmtree('%s/mask/' % result_dir)
     if draw_image:
         if os.path.exists('%s/images/' % result_dir): shutil.rmtree('%s/images/' % result_dir)
     if not os.path.exists('%s/' % result_dir): os.mkdir('%s/' % result_dir)
     os.mkdir('%s/bbox/' % result_dir)
+    os.mkdir('%s/mask/' % result_dir)
     if draw_image:
         os.mkdir('%s/images/' % result_dir)
 
