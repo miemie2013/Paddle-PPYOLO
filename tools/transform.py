@@ -11,6 +11,7 @@ import cv2
 import uuid
 import random
 import numpy as np
+from scipy import ndimage
 from PIL import Image, ImageEnhance, ImageDraw
 
 import logging

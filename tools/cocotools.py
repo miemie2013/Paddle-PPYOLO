@@ -97,4 +97,24 @@ def bbox_eval(anno_file):
     sys.stdout.flush()
     return map_stats
 
+def mask_eval(anno_file):
+    from pycocotools.coco import COCO
+
+    coco_gt = COCO(anno_file)
+
+    outfile = 'eval_results/mask_detections.json'
+    logger.info('Generating json file...')
+    mask_list = []
+    path_dir = os.listdir('eval_results/mask/')
+    for name in path_dir:
+        with open('eval_results/mask/' + name, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                r_list = json.loads(line)
+                mask_list += r_list
+    with open(outfile, 'w') as f:
+        json.dump(mask_list, f)
+
+    return cocoapi_eval(outfile, 'segm', coco_gt=coco_gt)
+
 
