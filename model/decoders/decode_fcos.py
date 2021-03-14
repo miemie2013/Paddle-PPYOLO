@@ -35,7 +35,7 @@ class Decode_FCOS(object):
                                        max_size=max_size, use_cv2=cfg.resizeImage['use_cv2'])
         self.permute = Permute(**cfg.permute)
         # batch_transforms
-        self.padBatch = PadBatch(use_padded_im_info=True, pad_to_stride=cfg.padBatch['pad_to_stride'])
+        self.padBatch = PadBatch(use_padded_im_info=True, pad_to_stride=cfg.padBatchSingle['pad_to_stride'])
         self.padBatchSingle = PadBatchSingle(use_padded_im_info=True)
 
 

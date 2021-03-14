@@ -124,10 +124,15 @@ def get_transforms(cfg):
             preprocess = Permute(**cfg.permute)    # 图片从HWC格式变成CHW格式
         elif preprocess_name == 'gt2YoloTarget':
             preprocess = Gt2YoloTargetSingle(**cfg.gt2YoloTarget)   # 填写target张量。
+        elif preprocess_name == 'padBatchSingle':
+            use_padded_im_info = cfg.padBatchSingle['use_padded_im_info'] if 'use_padded_im_info' in cfg.padBatchSingle else None
+            preprocess = PadBatchSingle(use_padded_im_info=use_padded_im_info)   # 填充黑边。使这一批图片有相同的大小。
         elif preprocess_name == 'padBatch':
-            preprocess = PadBatchSingle(use_padded_im_info=cfg.padBatch['use_padded_im_info'])   # 填充黑边。使这一批图片有相同的大小。
-        elif preprocess_name == 'gt2FCOSTarget':
-            preprocess = Gt2FCOSTargetSingle(**cfg.gt2FCOSTarget)   # 填写target张量。
+            preprocess = PadBatch(**cfg.padBatch)                         # 填充黑边。使这一批图片有相同的大小。
+        elif preprocess_name == 'gt2FCOSTargetSingle':
+            preprocess = Gt2FCOSTargetSingle(**cfg.gt2FCOSTargetSingle)   # 填写target张量。
+        elif preprocess_name == 'gt2Solov2Target':
+            preprocess = Gt2Solov2Target(**cfg.gt2Solov2Target)     # 填写target张量。
         batch_transforms.append(preprocess)
     return sample_transforms, batch_transforms
 

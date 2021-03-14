@@ -211,6 +211,7 @@ if __name__ == '__main__':
     parser = SOLOArgParser()
     use_gpu = parser.get_use_gpu()
     cfg = parser.get_cfg()
+    cfg = SOLOv2_light_r50_vd_fpn_dcn_512_3x_Config()
     print(paddle.__version__)
     paddle.disable_static()   # 开启动态图
     gpu_id = int(os.environ.get('FLAGS_selected_gpus', 0))
@@ -253,7 +254,6 @@ if __name__ == '__main__':
     iter_id = 0
 
     # 创建模型
-    n_layers = len(cfg.gt2Solov2Target['num_grids'])
     Backbone = select_backbone(cfg.backbone_type)
     backbone = Backbone(**cfg.backbone)
     FPN = select_fpn(cfg.fpn_type)
@@ -341,10 +341,12 @@ if __name__ == '__main__':
     batch_size = cfg.train_cfg['batch_size']
     with_mixup = cfg.decodeImage['with_mixup']
     with_cutmix = cfg.decodeImage['with_cutmix']
-    with_mosaic = cfg.decodeImage['with_mosaic']
+    # with_mosaic = cfg.decodeImage['with_mosaic']
+    with_mosaic = False
     mixup_epoch = cfg.train_cfg['mixup_epoch']
     cutmix_epoch = cfg.train_cfg['cutmix_epoch']
-    mosaic_epoch = cfg.train_cfg['mosaic_epoch']
+    # mosaic_epoch = cfg.train_cfg['mosaic_epoch']
+    mosaic_epoch = -1
     context = cfg.context
     # 预处理
     sample_transforms, batch_transforms = get_transforms(cfg)
@@ -357,7 +359,7 @@ if __name__ == '__main__':
         print('%s' % str(type(trf)))
 
     # 输出几个特征图
-    n_layers = len(cfg.gt2FCOSTarget['downsample_ratios'])
+    n_layers = len(cfg.gt2Solov2Target['num_grids'])
 
     # 保存模型的目录
     if not os.path.exists('./weights'): os.mkdir('./weights')

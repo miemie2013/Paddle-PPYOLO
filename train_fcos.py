@@ -125,7 +125,7 @@ def read_train_data(cfg,
                 t.join()
 
             # batch_transforms。需要先同步PadBatch
-            coarsest_stride = cfg.padBatch['pad_to_stride']
+            coarsest_stride = cfg.padBatchSingle['pad_to_stride']
             max_shape = np.array([data['image'].shape for data in samples]).max(
                 axis=0)  # max_shape=[3, max_h, max_w]
             max_shape[1] = int(  # max_h增加到最小的能被coarsest_stride=128整除的数

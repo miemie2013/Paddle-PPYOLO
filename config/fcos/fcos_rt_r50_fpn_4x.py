@@ -225,13 +225,13 @@ class FCOS_RT_R50_FPN_4x_Config(object):
             to_bgr=False,
             channel_first=True,
         )
-        # PadBatch
-        self.padBatch = dict(
+        # PadBatchSingle
+        self.padBatchSingle = dict(
             pad_to_stride=32,   # 添加黑边使得图片边长能够被pad_to_stride整除。pad_to_stride代表着最大下采样倍率，这个模型最大到p5，为32。
             use_padded_im_info=False,
         )
-        # Gt2FCOSTarget
-        self.gt2FCOSTarget = dict(
+        # Gt2FCOSTargetSingle
+        self.gt2FCOSTargetSingle = dict(
             object_sizes_boundary=[64, 128],
             center_sampling_radius=1.5,
             downsample_ratios=[8, 16, 32],
@@ -252,7 +252,7 @@ class FCOS_RT_R50_FPN_4x_Config(object):
         self.sample_transforms_seq.append('resizeImage')
         self.sample_transforms_seq.append('permute')
         self.batch_transforms_seq = []
-        self.batch_transforms_seq.append('padBatch')
-        self.batch_transforms_seq.append('gt2FCOSTarget')
+        self.batch_transforms_seq.append('padBatchSingle')
+        self.batch_transforms_seq.append('gt2FCOSTargetSingle')
 
 
