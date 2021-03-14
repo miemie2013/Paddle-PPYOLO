@@ -354,7 +354,7 @@ if __name__ == '__main__':
         print('%s' % str(type(trf)))
 
     # 输出几个特征图
-    n_layers = len(cfg.gt2FCOSTarget['downsample_ratios'])
+    n_layers = len(cfg.gt2FCOSTargetSingle['downsample_ratios'])
 
     # 保存模型的目录
     if not os.path.exists('./weights'): os.mkdir('./weights')
