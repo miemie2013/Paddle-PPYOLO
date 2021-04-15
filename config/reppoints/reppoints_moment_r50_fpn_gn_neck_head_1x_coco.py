@@ -53,20 +53,20 @@ class RepPoints_moment_r50_fpn_1x_Config(object):
             update_iter=1,    # 每隔几步更新一次参数
             log_iter=20,      # 每隔几步打印一次
             save_iter=1000,   # 每隔几步保存一次模型
-            eval_iter=20000,   # 每隔几步计算一次eval集的mAP
-            max_iters=360000,   # 训练多少步
+            eval_iter=10000,   # 每隔几步计算一次eval集的mAP
+            max_iters=90000,   # 训练多少步
             mixup_epoch=10,     # 前几轮进行mixup
             cutmix_epoch=10,    # 前几轮进行cutmix
             mosaic_epoch=1000,  # 前几轮进行mosaic
         )
         self.learningRate = dict(
-            base_lr=0.01,
+            base_lr=0.02,
             PiecewiseDecay=dict(
                 gamma=0.1,
-                milestones=[300000, 340000],
+                milestones=[60000, 80000],
             ),
             LinearWarmup=dict(
-                start_factor=0.3333333333333333,
+                start_factor=0.001,
                 steps=500,
             ),
         )
