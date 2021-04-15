@@ -120,4 +120,34 @@ class SOLOArgParser(object):
         return cfg
 
 
+class RepPointsArgParser(object):
+    def __init__(self):
+        parser = argparse.ArgumentParser(description='Script', formatter_class=argparse.RawTextHelpFormatter)
+        parser.add_argument('--use_gpu', type=bool, default=True, help='whether to use gpu. True or False')
+        parser.add_argument('-c', '--config', type=int, default=0,
+                            choices=[0, 1, 2, 3, 4],
+                            help=textwrap.dedent('''\
+                            select one of these config files:
+                            0 -- reppoints_moment_r50_fpn_gn_neck_head_1x_coco.py
+                            1 -- reppoints_moment_r50_fpn_gn_neck_head_1x_coco.py
+                            2 -- reppoints_moment_r50_fpn_gn_neck_head_1x_coco.py'''))
+        self.args = parser.parse_args()
+        self.config_file = self.args.config
+        self.use_gpu = self.args.use_gpu
+
+    def get_use_gpu(self):
+        return self.use_gpu
+
+    def get_cfg(self):
+        config_file = self.config_file
+        cfg = None
+        if config_file == 0:
+            cfg = RepPoints_moment_r50_fpn_1x_Config()
+        elif config_file == 1:
+            cfg = RepPoints_moment_r50_fpn_1x_Config()
+        elif config_file == 2:
+            cfg = RepPoints_moment_r50_fpn_1x_Config()
+        return cfg
+
+
 

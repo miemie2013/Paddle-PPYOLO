@@ -52,10 +52,9 @@ def save_img(filename, image):
     cv2.imwrite('images/res/' + filename, image)
 
 if __name__ == '__main__':
-    parser = FCOSArgParser()
+    parser = RepPointsArgParser()
     use_gpu = parser.get_use_gpu()
     cfg = parser.get_cfg()
-    cfg = RepPoints_moment_r50_fpn_1x_Config()
     print(paddle.__version__)
     paddle.disable_static()   # 开启动态图
     gpu_id = int(os.environ.get('FLAGS_selected_gpus', 0))
