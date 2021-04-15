@@ -30,6 +30,7 @@ class FPN(paddle.nn.Layer):
                  norm_decay=0.,
                  freeze_norm=False,
                  use_c5=True,
+                 relu_before_extra_convs=False,
                  reverse_out=False):
         super(FPN, self).__init__()
         self.in_channels = in_channels
@@ -42,6 +43,7 @@ class FPN(paddle.nn.Layer):
         self.norm_type = norm_type
         self.norm_decay = norm_decay
         self.use_c5 = use_c5
+        self.relu_before_extra_convs = relu_before_extra_convs
         self.reverse_out = reverse_out
 
         self.num_backbone_stages = len(in_channels)   # 进入FPN的张量个数
@@ -82,10 +84,12 @@ class FPN(paddle.nn.Layer):
                 in_c = self.num_chan
                 fan = in_c * 3 * 3
             for i in range(highest_backbone_level + 1, self.max_level + 1):
-                conv = Conv2dUnit(in_c, self.num_chan, 3, stride=2, bias_attr=True, norm_type=None, bias_lr=2.0,
+                use_bias = True if norm_type is None else False
+                conv = Conv2dUnit(in_c, self.num_chan, 3, stride=2, bias_attr=use_bias, norm_type=norm_type, bias_lr=2.0,
                                   weight_init=Xavier(fan_out=fan), bias_init=Constant(0.0),
                                   act=None, freeze_norm=self.freeze_norm, norm_decay=self.norm_decay, name='fpn_%d' % (i, ))
                 self.extra_convs.append(conv)
+                in_c = self.num_chan
 
 
     def forward(self, body_feats):
@@ -153,7 +157,7 @@ class FPN(paddle.nn.Layer):
                 fpn_blob = fpn_output[0]
             for i in range(highest_backbone_level + 1, self.max_level + 1):
                 fpn_blob_in = fpn_blob
-                if i > highest_backbone_level + 1:
+                if i > highest_backbone_level + 1 and self.relu_before_extra_convs:
                     fpn_blob_in = fluid.layers.relu(fpn_blob)
                 fpn_blob = self.extra_convs[i - highest_backbone_level - 1](fpn_blob_in)
                 fpn_output.insert(0, fpn_blob)

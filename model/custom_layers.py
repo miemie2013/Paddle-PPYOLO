@@ -596,4 +596,42 @@ class DropBlock(paddle.nn.Layer):
         return output
 
 
+class PointGenerator(object):
+
+    def _meshgrid(self, x, y, w, h, row_major=True):
+        xx = L.expand(L.reshape(x, (1, -1)), [h, 1])
+        yy = L.expand(L.reshape(y, (-1, 1)), [1, w])
+
+        xx = L.reshape(xx, (-1, ))
+        yy = L.reshape(yy, (-1, ))
+        if row_major:
+            return xx, yy
+        else:
+            return yy, xx
+
+    def grid_points(self, featmap_size, stride=16):
+        feat_h, feat_w = featmap_size
+        shift_x = L.range(0., feat_w, 1., dtype='float32') * stride
+        shift_y = L.range(0., feat_h, 1., dtype='float32') * stride
+
+        shift_xx, shift_yy = self._meshgrid(shift_x, shift_y, feat_w, feat_h)
+        stride = paddle.full(shape=shift_xx.shape, fill_value=stride, dtype='float32')
+        all_points = paddle.stack([shift_xx, shift_yy, stride], axis=-1)
+        return all_points
+
+    def valid_flags(self, featmap_size, valid_size, device='cuda'):
+        # feat_h, feat_w = featmap_size
+        # valid_h, valid_w = valid_size
+        # assert valid_h <= feat_h and valid_w <= feat_w
+        # valid_x = torch.zeros(feat_w, dtype=torch.bool, device=device)
+        # valid_y = torch.zeros(feat_h, dtype=torch.bool, device=device)
+        # valid_x[:valid_w] = 1
+        # valid_y[:valid_h] = 1
+        # valid_xx, valid_yy = self._meshgrid(valid_x, valid_y)
+        # valid = valid_xx & valid_yy
+        # return valid
+        pass
+
+
+
 

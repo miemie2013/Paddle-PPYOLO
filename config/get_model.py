@@ -19,6 +19,7 @@ from model.anchor_heads.yolov4_head import *
 from model.anchor_heads.fcos_head import *
 from model.anchor_heads.maskfeat_head import *
 from model.anchor_heads.solov2_head import *
+from model.anchor_heads.reppoints_head import *
 
 from model.losses.yolov3_loss import *
 from model.losses.my_loss import *
@@ -52,6 +53,8 @@ def select_head(name):
         return SOLOv2Head
     if name == 'MaskFeatHead':
         return MaskFeatHead
+    if name == 'RepPointsHead':
+        return RepPointsHead
 
 def select_fpn(name):
     if name == 'FPN':

@@ -27,4 +27,6 @@ from .solo.solov2_light_448_r50_fpn_8gpu_3x import *
 from .solo.solov2_light_r50_vd_fpn_dcn_512_3x import *
 from .solo.solov2_r50_fpn_8gpu_3x import *
 
+from .reppoints.reppoints_moment_r50_fpn_gn_neck_head_1x_coco import *
+
 
