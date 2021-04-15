@@ -60,7 +60,7 @@ class RepPoints_moment_r50_fpn_1x_Config(object):
             mosaic_epoch=1000,  # 前几轮进行mosaic
         )
         self.learningRate = dict(
-            base_lr=0.02,
+            base_lr=0.01,
             PiecewiseDecay=dict(
                 gamma=0.1,
                 milestones=[60000, 80000],
