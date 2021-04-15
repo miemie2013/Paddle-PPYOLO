@@ -90,11 +90,11 @@ class Decode_RepPoints(object):
         result_classes[i] = classes
 
     # 处理一批图片
-    def detect_batch(self, batch_img, batch_pimage, batch_im_info, draw_image, draw_thresh=0.0):
+    def detect_batch(self, batch_img, batch_pimage, batch_img_metas, draw_image, draw_thresh=0.0):
         batch_size = len(batch_img)
         result_image, result_boxes, result_scores, result_classes = [None] * batch_size, [None] * batch_size, [None] * batch_size, [None] * batch_size
 
-        pred = self.predict(batch_pimage, batch_im_info)   # [bs, M, 6]
+        pred = self.predict(batch_pimage, batch_img_metas)   # [bs, M, 6]
 
         threads = []
         for i in range(batch_size):
