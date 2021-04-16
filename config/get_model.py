@@ -26,6 +26,7 @@ from model.losses.my_loss import *
 from model.losses.iou_losses import *
 from model.losses.fcos_loss import *
 from model.losses.solov2_loss import *
+from model.losses.reppoints_loss import *
 
 
 def select_backbone(name):
@@ -73,6 +74,8 @@ def select_loss(name):
         return FCOSLoss
     if name == 'SOLOv2Loss':
         return SOLOv2Loss
+    if name == 'RepPointsLoss':
+        return RepPointsLoss
 
 def select_regularization(name):
     if name == 'L1Decay':

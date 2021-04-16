@@ -133,6 +133,8 @@ def get_transforms(cfg):
             preprocess = Gt2FCOSTargetSingle(**cfg.gt2FCOSTargetSingle)   # 填写target张量。
         elif preprocess_name == 'gt2Solov2Target':
             preprocess = Gt2Solov2Target(**cfg.gt2Solov2Target)     # 填写target张量。
+        elif preprocess_name == 'gt2RepPointsTargetSingle':
+            preprocess = Gt2RepPointsTargetSingle(**cfg.gt2RepPointsTargetSingle)     # 填写target张量。
         batch_transforms.append(preprocess)
     return sample_transforms, batch_transforms
 

@@ -47,8 +47,8 @@ class RepPoints_moment_r50_fpn_1x_Config(object):
             num_workers=5,   # 读数据的进程数
             num_threads=5,   # 读数据的线程数
             max_batch=2,     # 最大读多少个批
-            model_path='dygraph_reppoints_r50_fpn_1x.pdparams',
-            # model_path='dygraph_r50vb_cos.pdparams',
+            # model_path='dygraph_reppoints_r50_fpn_1x.pdparams',
+            model_path='dygraph_r50vb_cos.pdparams',
             # model_path='./weights/1000.pdparams',
             update_iter=1,    # 每隔几步更新一次参数
             log_iter=20,      # 每隔几步打印一次
@@ -148,8 +148,8 @@ class RepPoints_moment_r50_fpn_1x_Config(object):
             centerness_on_reg=True,
             use_dcn_in_tower=False,
         )
-        self.fcos_loss_type = 'FCOSLoss'
-        self.fcos_loss = dict(
+        self.reppoints_loss_type = 'RepPointsLoss'
+        self.reppoints_loss = dict(
             loss_alpha=0.25,
             loss_gamma=2.0,
             iou_loss_type='giou',  # linear_iou/giou/iou/ciou
@@ -212,10 +212,10 @@ class RepPoints_moment_r50_fpn_1x_Config(object):
         # 图片短的那一边缩放到选中的target_size，长的那一边等比例缩放；如果这时候长的那一边大于max_size，
         # 那么改成长的那一边缩放到max_size，短的那一边等比例缩放。这时候im_scale_x = im_scale， im_scale_y = im_scale。
         # resize_box=True 表示真实框（格式是x0y0x1y1）也跟着缩放，横纵坐标分别乘以im_scale_x、im_scale_y。
-        # resize_box=False表示真实框（格式是x0y0x1y1）不跟着缩放，因为后面会在Gt2FCOSTarget中缩放。
+        # resize_box=False表示真实框（格式是x0y0x1y1）不跟着缩放，因为后面会在Gt2RepPointsTarget中缩放。
         self.resizeImage = dict(
-            target_size=[256, 288, 320, 352, 384, 416, 448, 480, 512, 544, 576, 608],
-            max_size=900,
+            target_size=800,
+            max_size=1333,
             interp=1,
             use_cv2=True,
             resize_box=False,
@@ -227,11 +227,11 @@ class RepPoints_moment_r50_fpn_1x_Config(object):
         )
         # PadBatchSingle
         self.padBatchSingle = dict(
-            pad_to_stride=32,   # 添加黑边使得图片边长能够被pad_to_stride整除。pad_to_stride代表着最大下采样倍率，这个模型最大到p5，为32。
+            pad_to_stride=32,   # 添加黑边使得图片边长能够被pad_to_stride整除。reppoints为32。
             use_padded_im_info=False,
         )
-        # Gt2FCOSTargetSingle
-        self.gt2FCOSTargetSingle = dict(
+        # Gt2RepPointsTargetSingle
+        self.gt2RepPointsTargetSingle = dict(
             object_sizes_boundary=[64, 128],
             center_sampling_radius=1.5,
             downsample_ratios=[8, 16, 32],
@@ -253,6 +253,6 @@ class RepPoints_moment_r50_fpn_1x_Config(object):
         self.sample_transforms_seq.append('permute')
         self.batch_transforms_seq = []
         self.batch_transforms_seq.append('padBatchSingle')
-        self.batch_transforms_seq.append('gt2FCOSTargetSingle')
+        self.batch_transforms_seq.append('gt2RepPointsTargetSingle')
 
 
